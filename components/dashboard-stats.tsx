@@ -1,9 +1,18 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp, TrendingDown, Minus, Droplets, Thermometer, Wind, Sun, Leaf } from 'lucide-react'
 import { WeatherData, FirebaseSensorData, Crop } from '@/lib/types'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
+
+// Fixed colors for charts that work in both light and dark mode
+const CHART_COLORS = {
+  temp: '#f59e0b',
+  humidity: '#3b82f6', 
+  soil: '#22c55e',
+  primary: '#16a34a'
+}
 
 interface DashboardStatsProps {
   weather?: WeatherData
@@ -121,35 +130,39 @@ export function DashboardStats({ weather, sensorData, forecast, crop }: Dashboar
                   <AreaChart data={chartData}>
                     <defs>
                       <linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--chart-4))" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="hsl(var(--chart-4))" stopOpacity={0}/>
+                        <stop offset="5%" stopColor={CHART_COLORS.temp} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={CHART_COLORS.temp} stopOpacity={0}/>
                       </linearGradient>
                     </defs>
                     <XAxis 
                       dataKey="date" 
-                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      tick={{ fontSize: 12 }}
                       axisLine={false}
                       tickLine={false}
+                      className="fill-muted-foreground"
                     />
                     <YAxis 
-                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      tick={{ fontSize: 12 }}
                       axisLine={false}
                       tickLine={false}
                       width={30}
+                      className="fill-muted-foreground"
                     />
                     <Tooltip 
                       contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
+                        backgroundColor: 'var(--color-card)',
+                        border: '1px solid var(--color-border)',
                         borderRadius: '8px',
-                        color: 'hsl(var(--foreground))'
+                        color: 'var(--color-foreground)'
                       }}
+                      labelStyle={{ color: 'var(--color-foreground)' }}
+                      itemStyle={{ color: CHART_COLORS.temp }}
                       formatter={(value: number) => [`${value}°C`, 'Temperatur']}
                     />
                     <Area 
                       type="monotone" 
                       dataKey="temp" 
-                      stroke="hsl(var(--chart-4))"
+                      stroke={CHART_COLORS.temp}
                       fill="url(#tempGradient)"
                       strokeWidth={2}
                     />
@@ -170,28 +183,31 @@ export function DashboardStats({ weather, sensorData, forecast, crop }: Dashboar
                   <LineChart data={chartData}>
                     <XAxis 
                       dataKey="date" 
-                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      tick={{ fontSize: 12 }}
                       axisLine={false}
                       tickLine={false}
+                      className="fill-muted-foreground"
                     />
                     <YAxis 
-                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      tick={{ fontSize: 12 }}
                       axisLine={false}
                       tickLine={false}
                       width={30}
+                      className="fill-muted-foreground"
                     />
                     <Tooltip 
                       contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
+                        backgroundColor: 'var(--color-card)',
+                        border: '1px solid var(--color-border)',
                         borderRadius: '8px',
-                        color: 'hsl(var(--foreground))'
+                        color: 'var(--color-foreground)'
                       }}
+                      labelStyle={{ color: 'var(--color-foreground)' }}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="humidity" 
-                      stroke="hsl(var(--chart-3))"
+                      stroke={CHART_COLORS.humidity}
                       strokeWidth={2}
                       dot={false}
                       name="Rütubət %"
@@ -199,7 +215,7 @@ export function DashboardStats({ weather, sensorData, forecast, crop }: Dashboar
                     <Line 
                       type="monotone" 
                       dataKey="soilMoisture" 
-                      stroke="hsl(var(--primary))"
+                      stroke={CHART_COLORS.soil}
                       strokeWidth={2}
                       dot={false}
                       name="Torpaq Nəmliyi %"
