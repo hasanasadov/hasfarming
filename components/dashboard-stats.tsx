@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp, TrendingDown, Minus, Droplets, Thermometer, Wind, Sun, Leaf } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, Droplets, Thermometer, Wind, Sun, Leaf, RefreshCw } from 'lucide-react'
 import { WeatherData, FirebaseSensorData, Crop } from '@/lib/types'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
+import { Badge } from '@/components/ui/badge'
 
 // Fixed colors for charts that work in both light and dark mode
 const CHART_COLORS = {
@@ -22,9 +23,17 @@ interface DashboardStatsProps {
 }
 
 export function DashboardStats({ weather, sensorData, forecast, crop }: DashboardStatsProps) {
-  const currentTemp = sensorData?.airTemperature || weather?.temp || 0
-  const currentHumidity = sensorData?.humidity || weather?.humidity || 0
-  const soilMoisture = sensorData?.soilMoisture || weather?.soilMoisture || 0
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  
+  // Update timestamp when data changes
+  useEffect(() => {
+    setLastUpdate(new Date())
+  }, [weather, sensorData, forecast])
+
+  // Memoize current values to prevent unnecessary recalculations
+  const currentTemp = useMemo(() => sensorData?.airTemperature || weather?.temp || 0, [sensorData?.airTemperature, weather?.temp])
+  const currentHumidity = useMemo(() => sensorData?.humidity || weather?.humidity || 0, [sensorData?.humidity, weather?.humidity])
+  const soilMoisture = useMemo(() => sensorData?.soilMoisture || weather?.soilMoisture || 0, [sensorData?.soilMoisture, weather?.soilMoisture])
 
   // Calculate trends
   const getTrend = (current: number, optimal: { min: number; max: number }) => {
@@ -51,8 +60,36 @@ export function DashboardStats({ weather, sensorData, forecast, crop }: Dashboar
     return <Minus className="h-4 w-4 text-primary" />
   }
 
+  // Calculate overall health score
+  const overallHealth = useMemo(() => {
+    if (!crop) return 0
+    const tempScore = Math.max(0, 100 - Math.abs(currentTemp - (crop.optimalTemp.min + crop.optimalTemp.max) / 2) * 5)
+    const humidityScore = Math.max(0, 100 - Math.abs(currentHumidity - (crop.optimalHumidity.min + crop.optimalHumidity.max) / 2) * 2)
+    const soilScore = Math.max(0, 100 - Math.abs(soilMoisture - 55) * 2)
+    return Math.round((tempScore + humidityScore + soilScore) / 3)
+  }, [crop, currentTemp, currentHumidity, soilMoisture])
+
   return (
     <div className="space-y-6">
+      {/* Live Status Bar */}
+      <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-sm text-muted-foreground">Canlı məlumatlar</span>
+        </div>
+        <div className="flex items-center gap-4">
+          {crop && (
+            <Badge variant={overallHealth >= 70 ? "default" : overallHealth >= 40 ? "secondary" : "destructive"}>
+              Ümumi sağlamlıq: {overallHealth}%
+            </Badge>
+          )}
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <RefreshCw className="h-3 w-3" />
+            Son yenilənmə: {lastUpdate.toLocaleTimeString('az-AZ')}
+          </span>
+        </div>
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-border/50">

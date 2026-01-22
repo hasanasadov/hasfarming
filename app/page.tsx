@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useEffect } from "react";
 
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
@@ -62,7 +62,19 @@ export default function SmartFarmingApp() {
   const [selectedCrop, setSelectedCrop] = useState<Crop | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Refs for scroll functionality
+  const mainContentRef = useRef<HTMLDivElement>(null);
+  const stepContentRef = useRef<HTMLDivElement>(null);
+
   const currentStepIndex = steps.findIndex((s) => s.id === currentStep);
+
+  // Auto-scroll to top when step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (stepContentRef.current) {
+      stepContentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [currentStep]);
 
   const canProceed = useCallback(() => {
     switch (currentStep) {
@@ -139,11 +151,20 @@ export default function SmartFarmingApp() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Leaf className="h-6 w-6 text-primary" />
             </div>
-            <div>
+            <div className="hidden sm:block">
               <h1 className="font-bold text-lg text-foreground">AgriSense</h1>
-              <p className="text-xs text-muted-foreground hidden sm:block">
+              <p className="text-xs text-muted-foreground">
                 Ağıllı Kənd Təsərrüfatı
               </p>
+            </div>
+          </div>
+
+          {/* Mobile Current Step Indicator */}
+          <div className="flex md:hidden items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
+              {steps[currentStepIndex].icon}
+              <span>{steps[currentStepIndex].label}</span>
+              <span className="text-xs opacity-70">({currentStepIndex + 1}/{steps.length})</span>
             </div>
           </div>
 
@@ -172,20 +193,6 @@ export default function SmartFarmingApp() {
             ))}
           </nav>
 
-          {/* Mobile Menu Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          >
-            {isSidebarOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
-            )}
-          </Button>
-
           {/* Status Badges & Theme Toggle */}
           <div className="hidden md:flex items-center gap-2">
             {location && (
@@ -202,9 +209,20 @@ export default function SmartFarmingApp() {
             <ThemeToggle />
           </div>
 
-          {/* Mobile Theme Toggle */}
-          <div className="flex md:hidden items-center gap-2">
+          {/* Mobile Actions */}
+          <div className="flex md:hidden items-center gap-1">
             <ThemeToggle />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            >
+              {isSidebarOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </Button>
           </div>
         </div>
       </header>
@@ -213,11 +231,41 @@ export default function SmartFarmingApp() {
       {isSidebarOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div
-            className="absolute inset-0 bg-background/80"
+            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
             onClick={() => setIsSidebarOpen(false)}
           />
-          <div className="absolute left-0 top-16 bottom-0 w-64 bg-card border-r border-border p-4">
-            <nav className="space-y-2">
+          <div className="absolute right-0 top-16 bottom-0 w-72 bg-card border-l border-border p-4 shadow-xl">
+            {/* Status Section */}
+            <div className="mb-4 p-3 rounded-lg bg-muted/50 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cari Vəziyyət</p>
+              <div className="flex flex-wrap gap-2">
+                {location ? (
+                  <Badge variant="secondary" className="gap-1 text-xs">
+                    <MapPin className="h-3 w-3" />
+                    {location.address?.split(",")[0]}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
+                    <MapPin className="h-3 w-3" />
+                    Məkan seçilməyib
+                  </Badge>
+                )}
+                {selectedCrop ? (
+                  <Badge variant="secondary" className="gap-1 text-xs">
+                    {selectedCrop.icon} {selectedCrop.nameAz}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
+                    <Sprout className="h-3 w-3" />
+                    Bitki seçilməyib
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Addımlar</p>
+            <nav className="space-y-1">
               {steps.map((step, index) => (
                 <button
                   key={step.id}
@@ -227,7 +275,7 @@ export default function SmartFarmingApp() {
                       setIsSidebarOpen(false);
                     }
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors ${
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors ${
                     currentStep === step.id
                       ? "bg-primary text-primary-foreground"
                       : index < currentStepIndex
@@ -235,8 +283,13 @@ export default function SmartFarmingApp() {
                         : "text-muted-foreground hover:bg-muted"
                   }`}
                 >
-                  {step.icon}
-                  {step.label}
+                  <div className="flex items-center gap-3">
+                    {step.icon}
+                    {step.label}
+                  </div>
+                  {index < currentStepIndex && (
+                    <span className="w-2 h-2 rounded-full bg-primary" />
+                  )}
                 </button>
               ))}
             </nav>
@@ -265,7 +318,7 @@ export default function SmartFarmingApp() {
         </div>
 
         {/* Step Content */}
-        <div className="max-w-4xl mx-auto">
+        <div ref={stepContentRef} className="max-w-4xl mx-auto scroll-mt-24">
           {currentStep === "location" && (
             <div className="space-y-6">
               <LocationPicker

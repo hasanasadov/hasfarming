@@ -24,20 +24,13 @@ export function MapPicker({ onLocationSelect, selectedLocation, initialCenter }:
   const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(
     selectedLocation ? { lat: selectedLocation.lat, lng: selectedLocation.lng } : null
   )
+  const isInternalChange = useRef(false)
 
   // Convert lat/lng to tile coordinates
   const latLngToTile = useCallback((lat: number, lng: number, z: number) => {
     const x = Math.floor((lng + 180) / 360 * Math.pow(2, z))
     const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z))
     return { x, y }
-  }, [])
-
-  // Convert tile coordinates to lat/lng
-  const tileToLatLng = useCallback((x: number, y: number, z: number) => {
-    const n = Math.pow(2, z)
-    const lng = x / n * 360 - 180
-    const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI
-    return { lat, lng }
   }, [])
 
   // Calculate pixel offset within tile
@@ -75,6 +68,7 @@ export function MapPicker({ onLocationSelect, selectedLocation, initialCenter }:
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true)
     setDragStart({ x: e.clientX, y: e.clientY })
+    dragDistance.current = 0
   }
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -82,6 +76,9 @@ export function MapPicker({ onLocationSelect, selectedLocation, initialCenter }:
     
     const dx = e.clientX - dragStart.x
     const dy = e.clientY - dragStart.y
+    
+    // Track total drag distance
+    dragDistance.current += Math.abs(dx) + Math.abs(dy)
     
     const scale = 256 * Math.pow(2, zoom)
     const dLng = -dx / scale * 360
@@ -98,8 +95,16 @@ export function MapPicker({ onLocationSelect, selectedLocation, initialCenter }:
     setIsDragging(false)
   }
 
+  // Track drag distance to distinguish clicks from drags
+  const dragDistance = useRef(0)
+
   const handleClick = async (e: React.MouseEvent) => {
-    if (!mapRef.current || isDragging) return
+    // Only process as click if we didn't drag significantly
+    if (!mapRef.current || dragDistance.current > 5) {
+      dragDistance.current = 0
+      return
+    }
+    dragDistance.current = 0
     
     const rect = mapRef.current.getBoundingClientRect()
     const x = e.clientX - rect.left - rect.width / 2
@@ -114,6 +119,9 @@ export function MapPicker({ onLocationSelect, selectedLocation, initialCenter }:
 
     setMarkerPosition({ lat: newLat, lng: newLng })
     setIsLoading(true)
+    
+    // Mark this as an internal change so the useEffect doesn't reset our position
+    isInternalChange.current = true
 
     try {
       const response = await fetch(`/api/geocode?lat=${newLat}&lng=${newLng}`)
@@ -148,12 +156,15 @@ export function MapPicker({ onLocationSelect, selectedLocation, initialCenter }:
     }
   }
 
-  // Update marker when selectedLocation changes externally
+  // Only update marker/center when selectedLocation changes from EXTERNAL source (not our own click)
+  // We use a ref to track if we initiated the change
+  
   useEffect(() => {
-    if (selectedLocation) {
+    if (selectedLocation && !isInternalChange.current) {
       setMarkerPosition({ lat: selectedLocation.lat, lng: selectedLocation.lng })
       setMapCenter({ lat: selectedLocation.lat, lng: selectedLocation.lng })
     }
+    isInternalChange.current = false
   }, [selectedLocation])
 
   const tiles = getVisibleTiles()

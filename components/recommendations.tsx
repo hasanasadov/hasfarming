@@ -1,10 +1,11 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Droplets, Leaf, AlertTriangle, Info, Lightbulb, CheckCircle } from 'lucide-react'
+import { Droplets, Leaf, AlertTriangle, Info, Lightbulb, CheckCircle, Sparkles, RefreshCw } from 'lucide-react'
 import { Crop, WeatherData, FirebaseSensorData, Recommendation } from '@/lib/types'
+import { Button } from '@/components/ui/button'
 
 interface RecommendationsProps {
   crop: Crop
@@ -14,6 +15,13 @@ interface RecommendationsProps {
 }
 
 export function Recommendations({ crop, weather, sensorData, forecast }: RecommendationsProps) {
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  
+  // Update timestamp when data changes
+  useEffect(() => {
+    setLastUpdate(new Date())
+  }, [weather, sensorData, forecast, crop])
+
   const recommendations = useMemo(() => {
     const recs: Recommendation[] = []
     
@@ -197,16 +205,35 @@ export function Recommendations({ crop, weather, sensorData, forecast }: Recomme
     return 'text-muted-foreground'
   }
 
+  // Count critical and high priority recommendations
+  const criticalCount = recommendations.filter(r => r.priority === 'critical').length
+  const highCount = recommendations.filter(r => r.priority === 'high').length
+
   return (
     <Card className="border-border/50 shadow-lg">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-foreground">
-          <Lightbulb className="h-5 w-5 text-accent" />
-          Tövsiyələr
-        </CardTitle>
-        <CardDescription>
-          {crop.nameAz} üçün cari şəraitə əsaslanan fərdi tövsiyələr
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <Sparkles className="h-5 w-5 text-accent" />
+              AI Tövsiyələr
+            </CardTitle>
+            <CardDescription className="flex items-center gap-2 mt-1">
+              {crop.nameAz} üçün cari şəraitə əsaslanan fərdi tövsiyələr
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            {criticalCount > 0 && (
+              <Badge variant="destructive">{criticalCount} kritik</Badge>
+            )}
+            {highCount > 0 && (
+              <Badge className="bg-orange-500">{highCount} yüksək</Badge>
+            )}
+            <span className="text-xs text-muted-foreground">
+              {lastUpdate.toLocaleTimeString('az-AZ')}
+            </span>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {recommendations.map((rec, index) => (

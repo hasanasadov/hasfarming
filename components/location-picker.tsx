@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -117,38 +117,6 @@ export function LocationPicker({ onLocationSelect, selectedLocation }: LocationP
     setManualLat('')
     setManualLng('')
   }
-
-  // Watch for live location updates
-  useEffect(() => {
-    let watchId: number | null = null
-
-    if (selectedLocation && navigator.geolocation) {
-      watchId = navigator.geolocation.watchPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords
-          // Only update if significantly different (> 100m)
-          if (selectedLocation) {
-            const distance = Math.sqrt(
-              Math.pow(latitude - selectedLocation.lat, 2) +
-              Math.pow(longitude - selectedLocation.lng, 2)
-            )
-            if (distance > 0.001) { // ~100m
-              const address = await reverseGeocode(latitude, longitude)
-              onLocationSelect({ lat: latitude, lng: longitude, address })
-            }
-          }
-        },
-        (error) => console.log('Watch position error:', error),
-        { enableHighAccuracy: true }
-      )
-    }
-
-    return () => {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId)
-      }
-    }
-  }, [selectedLocation, onLocationSelect, reverseGeocode])
 
   return (
     <Card className="border-border/50 shadow-lg">
