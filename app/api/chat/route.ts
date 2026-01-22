@@ -12,34 +12,20 @@ function buildSystemPrompt(context: any) {
   const soilMoisture = context?.soilMoisture ?? "N/A";
 
   return (
-    `SİSTEM TƏLİMATI:\n` +
     `Sən AgriSense platformasının peşəkar aqronom köməkçisisən.\n` +
-    `Sən istənilən suala (suvarma, gübrələmə, xəstəlik riski, torpaq, hava, sensor oxunuşları, məhsuldarlıq və s.) düzgün cavab verməlisən.\n` +
-    `Dil: Azərbaycan dili.\n` +
-    `HƏDƏF: Həmişə konkret və TAMAMLANMIŞ cavab ver.\n` +
-    `Qaydalar:\n` +
-    `- Heç vaxt “aşağıdakıları nəzərə alın:” kimi yarımçıq cümlə ilə dayanma.\n` +
-    `- Hər cavabda mütləq ən az 1 konkret tövsiyə / addım yaz.\n` +
-    `- Məlumat çatmırsa: 2 qısa dəqiqləşdirici sual ver, amma yenə də ilkin praktik tövsiyə ver.\n` +
-    `- Format:\n` +
-    `  1) Qısa cavab (1-2 cümlə)\n` +
-    `  2) Addımlar / Tövsiyələr (3-7 bənd)\n` +
-    `  3) Risk/Qeyd + 1-2 sual (lazımdırsa)\n` +
+    `Dil: Azərbaycan dili.\n\n` +
     `Kontekst:\n` +
     `- Bitki: ${cropName}\n` +
     `- Hava: ${temp}°C, rütubət: ${humidity}\n` +
-    `- Torpaq rütubəti (sensor): ${soilMoisture}\n` +
-    `---\n`
-  );
-}
-
-function looksIncomplete(text: string) {
-  const t = (text || "").trim();
-  return (
-    t.length < 60 ||
-    /aşağıdakıları nəzərə alın[:.]?\s*$/i.test(t) ||
-    /nəzərə alın[:.]?\s*$/i.test(t) ||
-    t.endsWith(":")
+    `- Torpaq rütubəti (sensor): ${soilMoisture}\n\n` +
+    `Qaydalar (mütləq):\n` +
+    `1) Cavab həmişə TAMAMLANSIN, yarımçıq cümlə olmaz.\n` +
+    `2) Qısa və konkret yaz: maksimum 6 bənd.\n` +
+    `3) Əgər məlumat çatmırsa: 2 qısa sual ver + yenə də 1 praktik tövsiyə yaz.\n` +
+    `4) Format:\n` +
+    `   - 1 cümlə nəticə\n` +
+    `   - 3-6 maddə tövsiyə\n` +
+    `   - sonda "✅ Tamamlandı"\n`
   );
 }
 
@@ -64,59 +50,32 @@ export async function POST(request: Request) {
       );
     }
 
+    // health-check quota yeməsin
+    if (check) return Response.json({ status: "ok" });
+
     const url =
       "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent";
 
-    // ---- HEALTH CHECK ----
-    if (check) {
-      const r = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: "ping" }] }],
-        }),
-      });
+    const sys = buildSystemPrompt(context);
 
-      if (!r.ok) {
-        const errText = await r.text();
-        console.error("Health Check Error:", r.status, errText);
-        return Response.json(
-          { error: `Google API qoşulmadı: ${r.status}` },
-          { status: 500 },
-        );
-      }
+    // ✅ 1) system prompt ayrıca birinci mesajdır
+    const contents: any[] = [
+      { role: "user", parts: [{ text: `SİSTEM:\n${sys}` }] },
+    ];
 
-      return Response.json({ status: "ok" });
-    }
-
-    // ---- SYSTEM PROMPT ----
-    const systemPrompt = buildSystemPrompt(context);
-
-    // ---- messages -> contents ----
-    const cleaned = (messages as IncomingMessage[])
-      .filter((m) => m?.content?.trim())
-      .map((m) => ({
+    // ✅ 2) sonra chat tarixçəsi gəlir
+    for (const m of messages) {
+      if (!m?.content?.trim()) continue;
+      contents.push({
         role: m.role === "user" ? "user" : "model",
         parts: [{ text: m.content }],
-      }));
+      });
+    }
 
-    if (cleaned.length === 0) {
+    if (contents.length === 1) {
       return Response.json({ text: "Sualınızı yazın 🙂" });
     }
 
-    // system prompt-u son user mesajına əlavə et
-    for (let i = cleaned.length - 1; i >= 0; i--) {
-      if (cleaned[i].role === "user") {
-        cleaned[i].parts[0].text =
-          systemPrompt + `İSTİFADƏÇİ SUALI:\n` + cleaned[i].parts[0].text;
-        break;
-      }
-    }
-
-    // ---- 1) Main call ----
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -124,83 +83,55 @@ export async function POST(request: Request) {
         "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
-        contents: cleaned,
+        contents,
         generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 900,
+          temperature: 0.25,
+          topP: 0.8,
+          maxOutputTokens: 2000,
         },
       }),
     });
 
+    const raw = await res.text();
+    let data: any = null;
+    try {
+      data = JSON.parse(raw);
+    } catch {}
+
     if (!res.ok) {
-      const errText = await res.text();
-      console.error("Gemini API Error:", res.status, errText);
+      // 429-u düzgün qaytar
+      if (res.status === 429) {
+        const retryDelay =
+          data?.error?.details?.find((d: any) =>
+            String(d["@type"] || "").includes("RetryInfo"),
+          )?.retryDelay || "10s";
+
+        return Response.json(
+          { error: "Rate limit doldu", status: 429, retryDelay },
+          { status: 429 },
+        );
+      }
+
+      console.error("Gemini API Error:", res.status, raw);
       return Response.json(
         { error: `API Xətası: ${res.status}` },
         { status: 500 },
       );
     }
 
-    const data = await res.json();
-    const candidate = data?.candidates?.[0];
-
-    let text =
-      candidate?.content?.parts
+    const text =
+      data?.candidates?.[0]?.content?.parts
         ?.map((p: any) => p?.text)
         .filter(Boolean)
         .join("") || "";
 
-    // ---- 2) Repair retry (əgər natamamdırsa 1 dəfə təkrar) ----
-    if (looksIncomplete(text)) {
-      const repairedContents = structuredClone(cleaned);
-
-      // son user mesajına “tamamla” göstərişi əlavə et
-      for (let i = repairedContents.length - 1; i >= 0; i--) {
-        if (repairedContents[i].role === "user") {
-          repairedContents[i].parts[0].text =
-            repairedContents[i].parts[0].text +
-            "\n\nZƏHMƏT OLMASA: Cavabı tamamlayaq. Mütləq konkret addımlar və nümunə ver. Yarımçıq cümlə ilə dayanma.";
-          break;
-        }
-      }
-
-      const retryRes = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents: repairedContents,
-          generationConfig: {
-            temperature: 0.35,
-            maxOutputTokens: 900,
-          },
-        }),
-      });
-
-      if (retryRes.ok) {
-        const retryData = await retryRes.json();
-        const retryText =
-          retryData?.candidates?.[0]?.content?.parts
-            ?.map((p: any) => p?.text)
-            .filter(Boolean)
-            .join("") || "";
-
-        // daha dolu cavab gəlibsə onu götür
-        if (retryText.trim().length > (text || "").trim().length) {
-          text = retryText;
-        }
-      }
-    }
-
     return Response.json({
       text: text || "Cavab boş gəldi. Başqa sual ver 🙂",
     });
-  } catch (error: any) {
-    console.error("Server Xətası:", error);
+  } catch (e: any) {
+    console.error("Server Xətası:", e);
     return Response.json(
-      { error: "Xəta baş verdi: " + (error?.message || "Unknown error") },
+      { error: "Xəta baş verdi: " + (e?.message || "Unknown error") },
       { status: 500 },
     );
   }
