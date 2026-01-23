@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   Card,
   CardContent,
@@ -9,8 +15,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Bot,
   Send,
@@ -19,8 +26,22 @@ import {
   RefreshCw,
   Eraser,
   WifiOff,
+  Thermometer,
+  Droplets,
+  Wind,
+  Sun,
+  Sprout,
+  MapPin,
+  Cloud,
+  Database,
 } from "lucide-react";
-import { Location, Crop, WeatherData, FirebaseSensorData } from "@/lib/types";
+import {
+  Location,
+  Crop,
+  WeatherData,
+  FirebaseSensorData,
+  DataSource,
+} from "@/lib/types";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -35,11 +56,33 @@ interface AIChatProps {
   crop: Crop | null;
   weather: WeatherData | null;
   sensorData: FirebaseSensorData | null;
+  forecast: WeatherData[];
+  dayIndex: number;
+  dataSource: DataSource | null;
 }
 
-export function AIChat({ location, crop, weather, sensorData }: AIChatProps) {
+function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="sr-only">typing</span>
+      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/70 animate-bounce [animation-delay:-0.2s]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/70 animate-bounce [animation-delay:-0.1s]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/70 animate-bounce" />
+    </span>
+  );
+}
+
+export function AIChat({
+  location,
+  crop,
+  weather,
+  sensorData,
+  forecast,
+  dayIndex,
+  dataSource,
+}: AIChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -48,9 +91,75 @@ export function AIChat({ location, crop, weather, sensorData }: AIChatProps) {
   const [isChecking, setIsChecking] = useState(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  const crop_nameAz = crop?.nameAz || "Kənd təsərrüfatı";
+  const quickPrompts = useMemo(
+    () => [
+      "Bu gün suvarım, yoxsa gözləyim?",
+      "Sabah yağışa görə nə etməliyəm?",
+      "Torpaq nəmliyi aşağıdırsa nə qədər su vermək olar?",
+      "Bu həftə gübrə üçün plan ver",
+      "Bitkim üçün risk varmı? (temperatur/yağış)",
+    ],
+    [],
+  );
 
-  // ✅ Health-check artıq quota yemir (serverdə disabled)
+  const tips = useMemo(
+    () => [
+      "Yağış gözlənirsə suvarmanı azaltmaq daha məntiqlidir.",
+      "Torpaq nəmliyi 30%-dən aşağıdırsa stres başlayır.",
+      "Külək yüksəkdirsə buxarlanma artır — suvarma vaxtını səhər/axşam seç.",
+      "pH ölçüsün varsa, gübrə planı daha dəqiq olur.",
+    ],
+    [],
+  );
+  const [tip, setTip] = useState(tips[0]);
+
+  useEffect(() => {
+    if (!isLoading) return;
+    setTip(tips[Math.floor(Math.random() * tips.length)]);
+  }, [isLoading, tips]);
+
+  const cropNameAz = crop?.nameAz || "Kənd təsərrüfatı";
+  const selectedDay = forecast?.[dayIndex] ?? null;
+
+  // Context preview values (seçilmiş gün)
+  const preview = useMemo(() => {
+    const d = selectedDay || weather;
+    if (!d) return null;
+
+    const isToday = dayIndex === 0;
+    const soilFromSensor =
+      isToday && dataSource === "firebase"
+        ? sensorData?.soilMoisture
+        : undefined;
+
+    return {
+      label: isToday ? "Bu gün" : `Gün ${dayIndex + 1}`,
+      temp: d.temp,
+      tempMin: d.tempMin,
+      tempMax: d.tempMax,
+      precipitation: d.precipitation,
+      windSpeed: d.windSpeed,
+      uvIndex: d.uvIndex,
+      humidity: d.humidity,
+      soilMoisture: soilFromSensor ?? d.soilMoisture,
+      description: d.description,
+      source:
+        dataSource === "firebase"
+          ? "Sensor"
+          : dataSource === "weather"
+            ? "Hava API"
+            : "Seçilməyib",
+      sourceIcon:
+        dataSource === "firebase" ? (
+          <Database className="h-3.5 w-3.5" />
+        ) : (
+          <Cloud className="h-3.5 w-3.5" />
+        ),
+      hasSensorPriority: isToday && dataSource === "firebase",
+    };
+  }, [selectedDay, weather, dayIndex, dataSource, sensorData?.soilMoisture]);
+
+  // ✅ Health check
   useEffect(() => {
     const checkConnection = async () => {
       try {
@@ -61,7 +170,6 @@ export function AIChat({ location, crop, weather, sensorData }: AIChatProps) {
         });
 
         if (!res.ok) {
-          // fallback: səhifə açılır, chat işləsin
           console.warn("Health check failed:", res.status);
         }
 
@@ -69,13 +177,12 @@ export function AIChat({ location, crop, weather, sensorData }: AIChatProps) {
           {
             id: "welcome",
             role: "assistant",
-            content: `Salam! Mən **AgriSense AI** köməkçisiyəm. 🌾\n\n**${crop_nameAz}** ilə bağlı nə sualınız var?`,
+            content: `Salam! Mən **AgriSense AI** köməkçisiyəm. 🌾\n\n**${cropNameAz}** ilə bağlı nə sualınız var?`,
           },
         ]);
         setConnectionError(null);
       } catch (err) {
         console.error("AI Connection Failed:", err);
-        // burada “internet” xətası ola bilər
         setConnectionError(
           "Serverə qoşulmaq mümkün olmadı. İnterneti və deploy statusu yoxlayın.",
         );
@@ -85,116 +192,283 @@ export function AIChat({ location, crop, weather, sensorData }: AIChatProps) {
     };
 
     checkConnection();
-  }, [crop_nameAz]);
+  }, [cropNameAz]);
 
-  // ✅ Avto scroll
+  // ✅ Auto scroll
   useEffect(() => {
-    if (scrollRef.current) {
-      const scrollElement = scrollRef.current.querySelector(
-        "[data-radix-scroll-area-viewport]",
-      ) as HTMLDivElement | null;
+    if (!scrollRef.current) return;
+    const viewport = scrollRef.current.querySelector(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLDivElement | null;
+    if (!viewport) return;
 
-      if (scrollElement) {
-        scrollElement.scrollTo({
-          top: scrollElement.scrollHeight,
-          behavior: "smooth",
-        });
-      }
-    }
+    viewport.scrollTo({
+      top: viewport.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages, isLoading]);
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-
-    if (!input.trim() || isLoading || connectionError || isChecking) return;
-
-    const userText = input.trim();
-    setInput("");
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: userText,
-    };
-
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    setIsLoading(true);
-
-    const context = {
-      location,
-      crop,
-      weather: weather
-        ? { temp: weather.temp, humidity: weather.humidity }
+  const buildContext = useCallback(() => {
+    return {
+      meta: {
+        app: "AgriSense",
+        locale: "az-AZ",
+        nowISO: new Date().toISOString(),
+        selectedDayIndex: dayIndex,
+        dataSource,
+        sensorPriority: dataSource === "firebase" && dayIndex === 0,
+      },
+      location: location
+        ? { lat: location.lat, lng: location.lng, address: location.address }
         : null,
-      soilMoisture: sensorData?.soilMoisture ?? null,
+      crop: crop
+        ? {
+            id: crop.id,
+            name: crop.name,
+            nameAz: crop.nameAz,
+            growthDays: crop.growthDays,
+            waterNeeds: crop.waterNeeds,
+            optimalTemp: crop.optimalTemp,
+            optimalHumidity: crop.optimalHumidity,
+            optimalPh: crop.optimalPh,
+          }
+        : null,
+      current: {
+        weather: weather
+          ? {
+              date: weather.date,
+              temp: weather.temp,
+              tempMin: weather.tempMin,
+              tempMax: weather.tempMax,
+              humidity: weather.humidity,
+              precipitation: weather.precipitation,
+              windSpeed: weather.windSpeed,
+              uvIndex: weather.uvIndex,
+              description: weather.description,
+            }
+          : null,
+        sensor: sensorData
+          ? {
+              soilMoisture: sensorData.soilMoisture,
+              soilTemperature: sensorData.soilTemperature,
+              airTemperature: sensorData.airTemperature,
+              humidity: sensorData.humidity,
+              ph: sensorData.ph,
+              nitrogen: sensorData.nitrogen,
+              phosphorus: sensorData.phosphorus,
+              potassium: sensorData.potassium,
+              timestamp: sensorData.timestamp,
+            }
+          : null,
+      },
+      selectedDay: selectedDay
+        ? {
+            date: selectedDay.date,
+            temp: selectedDay.temp,
+            tempMin: selectedDay.tempMin,
+            tempMax: selectedDay.tempMax,
+            humidity: selectedDay.humidity,
+            precipitation: selectedDay.precipitation,
+            windSpeed: selectedDay.windSpeed,
+            uvIndex: selectedDay.uvIndex,
+            soilMoisture: selectedDay.soilMoisture,
+            description: selectedDay.description,
+          }
+        : null,
+      forecast7: (forecast || []).slice(0, 7).map((d) => ({
+        date: d.date,
+        temp: d.temp,
+        tempMin: d.tempMin,
+        tempMax: d.tempMax,
+        humidity: d.humidity,
+        precipitation: d.precipitation,
+        windSpeed: d.windSpeed,
+        uvIndex: d.uvIndex,
+        soilMoisture: d.soilMoisture,
+        description: d.description,
+      })),
     };
+  }, [
+    crop,
+    dataSource,
+    dayIndex,
+    forecast,
+    location,
+    selectedDay,
+    sensorData,
+    weather,
+  ]);
 
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: newMessages.map(({ role, content }) => ({ role, content })),
-          context,
-        }),
-      });
-      if (response.status === 429) {
-        const data = await response.json().catch(() => ({}));
+  const sendMessage = useCallback(
+    async (userText: string) => {
+      if (!userText.trim() || isLoading || connectionError || isChecking)
+        return;
+
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: userText.trim(),
+      };
+
+      const newMessages = [...messages, userMessage];
+      setMessages(newMessages);
+      setIsLoading(true);
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: newMessages.map(({ role, content }) => ({
+              role,
+              content,
+            })),
+            context: buildContext(),
+          }),
+        });
+
+        if (response.status === 429) {
+          const data = await response.json().catch(() => ({}));
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: `⚠️ Limit doldu. ${data.retryDelay || "10s"} sonra yenidən yoxlayın. ✅ Tamamlandı`,
+            },
+          ]);
+          return;
+        }
+
+        if (!response.ok) {
+          const t = await response.text().catch(() => "");
+          throw new Error(t || "API Error");
+        }
+
+        const data = await response.json();
         setMessages((prev) => [
           ...prev,
           {
             id: (Date.now() + 1).toString(),
             role: "assistant",
-            content: `⚠️ Limit doldu. ${data.retryDelay || "10s"} sonra yenidən yoxlayın. ✅ Tamamlandı`,
+            content: data.text,
           },
         ]);
-        return;
+      } catch (error) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content:
+              "❌ **Xəta:** Server xətası oldu. Zəhmət olmasa yenidən yoxlayın.",
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+        setTimeout(() => textareaRef.current?.focus(), 60);
       }
+    },
+    [buildContext, connectionError, isChecking, isLoading, messages],
+  );
 
-      if (!response.ok) {
-        const t = await response.text().catch(() => "");
-        throw new Error(t || "API Error");
-      }
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const text = input;
+    setInput("");
+    await sendMessage(text);
+  };
 
-      const data = await response.json();
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.text,
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
-    } catch (error) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content:
-            "❌ **Xəta:** Server xətası oldu. Zəhmət olmasa yenidən yoxlayın.",
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
+  // ✅ Enter send, Shift+Enter newline
+  const onKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== "Enter") return;
+    if (e.shiftKey) return; // newline
+    e.preventDefault();
+    if (!input.trim()) return;
+    const text = input;
+    setInput("");
+    await sendMessage(text);
   };
 
   return (
-    <Card className="border-border/50 shadow-lg h-[600px] flex flex-col">
+    <Card className="border-border/50 shadow-lg h-[740px] lg:h-[820px] flex flex-col">
       <CardHeader className="pb-3 border-b bg-muted/30">
-        <CardTitle className="flex items-center gap-2 text-lg">
+        <CardTitle className="flex items-center gap-2 text-xl">
           <Bot
-            className={`h-5 w-5 ${connectionError ? "text-red-500" : "text-primary"}`}
+            className={`h-6 w-6 ${connectionError ? "text-red-500" : "text-primary"}`}
           />
           AgriSense AI
         </CardTitle>
-        <CardDescription>
-          {connectionError ? (
-            <span className="text-red-500 font-medium">Sistem işləmir</span>
-          ) : (
-            "Süni intellekt ilə canlı məsləhətləşmə"
+
+        <CardDescription className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-muted-foreground">
+              Süni intellekt ilə canlı məsləhətləşmə
+            </span>
+
+            {location?.address && (
+              <span className="text-xs px-2 py-1 rounded-full bg-muted border flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5" />
+                {location.address.split(",")[0]}
+              </span>
+            )}
+
+            {crop && (
+              <span className="text-xs px-2 py-1 rounded-full bg-muted border flex items-center gap-1">
+                <Sprout className="h-3.5 w-3.5" />
+                {crop.nameAz}
+              </span>
+            )}
+
+            <span className="text-xs px-2 py-1 rounded-full bg-muted border flex items-center gap-1">
+              {preview?.sourceIcon}
+              {preview?.source ?? "Mənbə seçilməyib"}
+            </span>
+
+            <Badge variant="secondary" className="gap-1">
+              🗓 {preview?.label ?? "Seçilməyib"}
+              {preview?.hasSensorPriority ? " • sensor prioritet" : ""}
+            </Badge>
+          </div>
+
+          {/* ✅ Context Preview Pills */}
+          {preview && (
+            <div className="flex flex-wrap gap-2">
+              <span className="text-xs px-2 py-1 rounded-full border bg-background/60 flex items-center gap-1">
+                <Thermometer className="h-3.5 w-3.5 text-orange-500" />
+                {Math.round(preview.temp)}°C
+                <span className="opacity-70">
+                  ({Math.round(preview.tempMin)}°/{Math.round(preview.tempMax)}
+                  °)
+                </span>
+              </span>
+
+              <span className="text-xs px-2 py-1 rounded-full border bg-background/60 flex items-center gap-1">
+                <Droplets className="h-3.5 w-3.5 text-primary" />
+                Yağış: {Math.round(preview.precipitation)} mm
+              </span>
+
+              {typeof preview.soilMoisture === "number" && (
+                <span className="text-xs px-2 py-1 rounded-full border bg-background/60 flex items-center gap-1">
+                  <Droplets className="h-3.5 w-3.5 text-emerald-500" />
+                  Torpaq: {Math.round(preview.soilMoisture)}%
+                </span>
+              )}
+
+              <span className="text-xs px-2 py-1 rounded-full border bg-background/60 flex items-center gap-1">
+                <Wind className="h-3.5 w-3.5 text-blue-400" />
+                Külək: {Math.round(preview.windSpeed)} km/s
+              </span>
+
+              <span className="text-xs px-2 py-1 rounded-full border bg-background/60 flex items-center gap-1">
+                <Sun className="h-3.5 w-3.5 text-yellow-500" />
+                UV: {preview.uvIndex?.toFixed(1) ?? "N/A"}
+              </span>
+
+              <span className="text-xs px-2 py-1 rounded-full border bg-background/60">
+                {preview.description}
+              </span>
+            </div>
           )}
         </CardDescription>
       </CardHeader>
@@ -202,8 +476,8 @@ export function AIChat({ location, crop, weather, sensorData }: AIChatProps) {
       <CardContent className="flex-1 min-h-0 p-0 overflow-hidden bg-background flex flex-col">
         {isChecking ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p>AI Sistemi yoxlanılır...</p>
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-base">AI Sistemi yoxlanılır...</p>
           </div>
         ) : connectionError ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
@@ -212,7 +486,7 @@ export function AIChat({ location, crop, weather, sensorData }: AIChatProps) {
             </div>
             <div className="space-y-2">
               <h3 className="font-bold text-lg">Əlaqə Qurulmadı</h3>
-              <p className="text-sm text-muted-foreground max-w-[250px] mx-auto">
+              <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">
                 {connectionError}
               </p>
             </div>
@@ -223,7 +497,7 @@ export function AIChat({ location, crop, weather, sensorData }: AIChatProps) {
           </div>
         ) : (
           <ScrollArea
-            className="flex-1 min-h-0 p-4 [&_[data-radix-scroll-area-viewport]]:h-full"
+            className="flex-1 min-h-0 p-5 [&_[data-radix-scroll-area-viewport]]:h-full"
             ref={scrollRef}
           >
             <div className="space-y-6">
@@ -233,7 +507,7 @@ export function AIChat({ location, crop, weather, sensorData }: AIChatProps) {
                   className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}
                 >
                   <div
-                    className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border shadow-sm ${
+                    className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center border shadow-sm ${
                       message.role === "user"
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 border-green-200 dark:border-green-800"
@@ -247,18 +521,18 @@ export function AIChat({ location, crop, weather, sensorData }: AIChatProps) {
                   </div>
 
                   <div
-                    className={`flex-1 max-w-[85%] rounded-2xl p-4 shadow-sm text-sm ${
+                    className={`flex-1 max-w-[92%] rounded-2xl p-5 shadow-sm text-[15px] leading-relaxed ${
                       message.role === "user"
                         ? "bg-primary text-primary-foreground rounded-tr-none"
                         : "bg-muted/50 border border-border/50 rounded-tl-none text-foreground"
                     }`}
                   >
                     {message.role === "user" ? (
-                      <p>{message.content}</p>
+                      <p className="whitespace-pre-wrap">{message.content}</p>
                     ) : (
                       <div
-                        className="prose prose-sm dark:prose-invert max-w-none break-words
-                        prose-p:leading-relaxed prose-pre:bg-zinc-900 prose-pre:p-2 prose-pre:rounded-lg
+                        className="prose prose-base dark:prose-invert max-w-none break-words
+                        prose-p:leading-relaxed prose-pre:bg-zinc-900 prose-pre:p-3 prose-pre:rounded-lg
                         prose-strong:font-bold prose-headings:font-bold prose-headings:my-2"
                       >
                         <ReactMarkdown
@@ -283,14 +557,20 @@ export function AIChat({ location, crop, weather, sensorData }: AIChatProps) {
 
               {isLoading && (
                 <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
-                    <Bot className="h-4 w-4 text-green-700" />
+                  <div className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center border shadow-sm">
+                    <Bot className="h-4 w-4 text-green-700 dark:text-green-300" />
                   </div>
-                  <div className="bg-muted/50 border rounded-2xl rounded-tl-none p-4 flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span className="text-sm text-muted-foreground">
-                      Yazır...
-                    </span>
+
+                  <div className="flex-1 max-w-[92%] bg-muted/50 border border-border/50 rounded-2xl rounded-tl-none p-5 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <TypingDots />
+                      <span className="text-sm text-muted-foreground">
+                        AI yazır…
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground/80 mt-2">
+                      {tip}
+                    </p>
                   </div>
                 </div>
               )}
@@ -298,41 +578,71 @@ export function AIChat({ location, crop, weather, sensorData }: AIChatProps) {
           </ScrollArea>
         )}
 
-        <div className="p-4 border-t bg-background/95 backdrop-blur">
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <Input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={
-                connectionError
-                  ? "Sistem işləmir..."
-                  : "Sualınızı bura yazın..."
-              }
-              disabled={isLoading || !!connectionError || isChecking}
-              className="flex-1 shadow-sm"
-            />
-            <Button
-              type="submit"
-              disabled={
-                isLoading || !input.trim() || !!connectionError || isChecking
-              }
-              size="icon"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
+        {/* Bottom Composer */}
+        <div className="border-t bg-background/95 backdrop-blur">
+          {!connectionError && !isChecking && (
+            <div className="p-3 border-b border-border/60">
+              <div className="flex flex-wrap gap-2">
+                {quickPrompts.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => {
+                      setInput(p);
+                      setTimeout(() => textareaRef.current?.focus(), 30);
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-full border border-border bg-muted/40 hover:bg-muted transition"
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-            {messages.length > 2 && (
+          <div className="p-4">
+            <form onSubmit={handleSubmit} className="flex items-end gap-2">
+              <div className="flex-1">
+                <Textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder={
+                    connectionError ? "Sistem işləmir..." : "Sualınızı yazın… "
+                  }
+                  disabled={isLoading || !!connectionError || isChecking}
+                  className="min-h-[54px] max-h-[140px] resize-none text-[15px] leading-relaxed shadow-sm"
+                />
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Enter: göndər • Shift+Enter: yeni sətir
+                </p>
+              </div>
+
               <Button
-                type="button"
-                variant="outline"
+                type="submit"
+                disabled={
+                  isLoading || !input.trim() || !!connectionError || isChecking
+                }
+                className="h-[54px] w-[54px]"
                 size="icon"
-                onClick={() => setMessages(messages.slice(0, 1))}
               >
-                <Eraser className="h-4 w-4 text-muted-foreground" />
+                <Send className="h-5 w-5" />
               </Button>
-            )}
-          </form>
+
+              {messages.length > 2 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-[54px] w-[54px]"
+                  size="icon"
+                  onClick={() => setMessages(messages.slice(0, 1))}
+                >
+                  <Eraser className="h-5 w-5 text-muted-foreground" />
+                </Button>
+              )}
+            </form>
+          </div>
         </div>
       </CardContent>
     </Card>

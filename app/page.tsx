@@ -60,19 +60,20 @@ export default function SmartFarmingApp() {
   const [forecast, setForecast] = useState<WeatherData[]>([]);
   const [sensorData, setSensorData] = useState<FirebaseSensorData | null>(null);
   const [selectedCrop, setSelectedCrop] = useState<Crop | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [dayIndex, setDayIndex] = useState(0);
 
-  // Refs for scroll functionality
-  const mainContentRef = useRef<HTMLDivElement>(null);
   const stepContentRef = useRef<HTMLDivElement>(null);
 
   const currentStepIndex = steps.findIndex((s) => s.id === currentStep);
 
   // Auto-scroll to top when step changes
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
     if (stepContentRef.current) {
-      stepContentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      stepContentRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }
   }, [currentStep]);
 
@@ -144,7 +145,133 @@ export default function SmartFarmingApp() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      <Navbar
+        currentStep={currentStep}
+        currentStepIndex={currentStepIndex}
+        setCurrentStep={setCurrentStep}
+        location={location}
+        selectedCrop={selectedCrop}
+        canProceed={canProceed}
+      />
+      <main className="container mx-auto px-4 py-6">
+        <ProgressBar currentStepIndex={currentStepIndex} />
+
+        {/* Step Content */}
+        <div ref={stepContentRef} className="scroll-mt-24">
+          {currentStep === "location" && (
+            <div className="space-y-6">
+              <LocationPicker
+                onLocationSelect={handleLocationSelect}
+                selectedLocation={location}
+              />
+              <MapPicker
+                onLocationSelect={handleLocationSelect}
+                selectedLocation={location}
+              />
+            </div>
+          )}
+
+          {currentStep === "source" && (
+            <DataSourceSelector
+              onSourceSelect={handleSourceSelect}
+              selectedSource={dataSource}
+            />
+          )}
+
+          {currentStep === "data" && location && (
+            <div className="space-y-6">
+              {dataSource === "weather" && (
+                <WeatherDisplay
+                  location={location}
+                  onWeatherData={handleWeatherData}
+                />
+              )}
+              {dataSource === "firebase" && firebaseUrl && (
+                <>
+                  <FirebaseSensorDisplay
+                    firebaseUrl={firebaseUrl}
+                    onSensorData={handleSensorData}
+                  />
+                  <WeatherDisplay
+                    location={location}
+                    onWeatherData={handleWeatherData}
+                  />
+                </>
+              )}
+            </div>
+          )}
+
+          {currentStep === "crop" && (
+            <CropSelector
+              onCropSelect={handleCropSelect}
+              selectedCrop={selectedCrop}
+            />
+          )}
+
+          {currentStep === "dashboard" && selectedCrop && (
+            <div className="space-y-6">
+              <DashboardStats
+                weather={currentWeather || undefined}
+                sensorData={sensorData || undefined}
+                forecast={forecast}
+                crop={selectedCrop}
+                dayIndex={dayIndex}
+                onDayIndexChange={setDayIndex}
+              />
+
+              <div className="grid lg:grid-cols-2 gap-6">
+                <Recommendations
+                  crop={selectedCrop}
+                  weather={currentWeather || undefined}
+                  sensorData={sensorData || undefined}
+                  forecast={forecast}
+                  dayIndex={dayIndex}
+                />
+                <AIChat
+                  location={location}
+                  crop={selectedCrop}
+                  weather={currentWeather}
+                  sensorData={sensorData}
+                  forecast={forecast}
+                  dayIndex={dayIndex}
+                  dataSource={dataSource}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <NavigationButtons
+          currentStepIndex={currentStepIndex}
+          goToNextStep={goToNextStep}
+          goToPrevStep={goToPrevStep}
+          canProceed={canProceed}
+          setCurrentStep={setCurrentStep}
+        />
+      </main>
+    </div>
+  );
+}
+
+const Navbar = ({
+  currentStep,
+  currentStepIndex,
+  setCurrentStep,
+  location,
+  selectedCrop,
+  canProceed,
+}: {
+  currentStep: AppStep;
+  currentStepIndex: number;
+  setCurrentStep: (step: AppStep) => void;
+  location: Location | null;
+  selectedCrop: Crop | null;
+  canProceed: () => boolean;
+}) => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  return (
+    <>
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -164,7 +291,9 @@ export default function SmartFarmingApp() {
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
               {steps[currentStepIndex].icon}
               <span>{steps[currentStepIndex].label}</span>
-              <span className="text-xs opacity-70">({currentStepIndex + 1}/{steps.length})</span>
+              <span className="text-xs opacity-70">
+                ({currentStepIndex + 1}/{steps.length})
+              </span>
             </div>
           </div>
 
@@ -227,7 +356,6 @@ export default function SmartFarmingApp() {
         </div>
       </header>
 
-      {/* Mobile Sidebar */}
       {isSidebarOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div
@@ -237,7 +365,9 @@ export default function SmartFarmingApp() {
           <div className="absolute right-0 top-16 bottom-0 w-72 bg-card border-l border-border p-4 shadow-xl">
             {/* Status Section */}
             <div className="mb-4 p-3 rounded-lg bg-muted/50 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cari Vəziyyət</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Cari Vəziyyət
+              </p>
               <div className="flex flex-wrap gap-2">
                 {location ? (
                   <Badge variant="secondary" className="gap-1 text-xs">
@@ -245,7 +375,10 @@ export default function SmartFarmingApp() {
                     {location.address?.split(",")[0]}
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
+                  <Badge
+                    variant="outline"
+                    className="gap-1 text-xs text-muted-foreground"
+                  >
                     <MapPin className="h-3 w-3" />
                     Məkan seçilməyib
                   </Badge>
@@ -255,7 +388,10 @@ export default function SmartFarmingApp() {
                     {selectedCrop.icon} {selectedCrop.nameAz}
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
+                  <Badge
+                    variant="outline"
+                    className="gap-1 text-xs text-muted-foreground"
+                  >
                     <Sprout className="h-3 w-3" />
                     Bitki seçilməyib
                   </Badge>
@@ -264,7 +400,9 @@ export default function SmartFarmingApp() {
             </div>
 
             {/* Navigation */}
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Addımlar</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              Addımlar
+            </p>
             <nav className="space-y-1">
               {steps.map((step, index) => (
                 <button
@@ -296,247 +434,77 @@ export default function SmartFarmingApp() {
           </div>
         </div>
       )}
+    </>
+  );
+};
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex justify-between text-sm text-muted-foreground mb-2">
-            <span>
-              Addım {currentStepIndex + 1} / {steps.length}
-            </span>
-            <span>{steps[currentStepIndex].label}</span>
-          </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary transition-all duration-300"
-              style={{
-                width: `${((currentStepIndex + 1) / steps.length) * 100}%`,
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Step Content */}
-        <div ref={stepContentRef} className="max-w-4xl mx-auto scroll-mt-24">
-          {currentStep === "location" && (
-            <div className="space-y-6">
-              <LocationPicker
-                onLocationSelect={handleLocationSelect}
-                selectedLocation={location}
-              />
-              <MapPicker
-                onLocationSelect={handleLocationSelect}
-                selectedLocation={location}
-              />
-            </div>
-          )}
-
-          {currentStep === "source" && (
-            <DataSourceSelector
-              onSourceSelect={handleSourceSelect}
-              selectedSource={dataSource}
-            />
-          )}
-
-          {currentStep === "data" && location && (
-            <div className="space-y-6">
-              {dataSource === "weather" && (
-                <WeatherDisplay
-                  location={location}
-                  onWeatherData={handleWeatherData}
-                />
-              )}
-              {dataSource === "firebase" && firebaseUrl && (
-                <>
-                  <FirebaseSensorDisplay
-                    firebaseUrl={firebaseUrl}
-                    onSensorData={handleSensorData}
-                  />
-                  <WeatherDisplay
-                    location={location}
-                    onWeatherData={handleWeatherData}
-                  />
-                </>
-              )}
-            </div>
-          )}
-
-          {currentStep === "crop" && (
-            <CropSelector
-              onCropSelect={handleCropSelect}
-              selectedCrop={selectedCrop}
-            />
-          )}
-
-          {currentStep === "dashboard" && selectedCrop && (
-            <div className="space-y-6">
-              <DashboardStats
-                weather={currentWeather || undefined}
-                sensorData={sensorData || undefined}
-                forecast={forecast}
-                crop={selectedCrop}
-              />
-
-              <div className="grid lg:grid-cols-2 gap-6">
-                <Recommendations
-                  crop={selectedCrop}
-                  weather={currentWeather || undefined}
-                  sensorData={sensorData || undefined}
-                  forecast={forecast}
-                />
-                <AIChat
-                  location={location}
-                  crop={selectedCrop}
-                  weather={currentWeather}
-                  sensorData={sensorData}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Navigation Buttons */}
-        <div className="max-w-4xl mx-auto mt-8 flex justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={goToPrevStep}
-            disabled={currentStepIndex === 0}
-            className="gap-2 bg-transparent"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Geri
-          </Button>
-
-          {currentStepIndex < steps.length - 1 ? (
-            <Button
-              type="button"
-              onClick={goToNextStep}
-              disabled={!canProceed()}
-              className="gap-2"
-            >
-              Davam et
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              onClick={() => setCurrentStep("location")}
-              variant="outline"
-              className="gap-2"
-            >
-              Yenidən başla
-            </Button>
-          )}
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="relative mt-12 overflow-hidden">
-        {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent opacity-50" />
-
-        <div className="relative border-t border-border">
-          <div className="container mx-auto px-4 py-10">
-            <div className="grid md:grid-cols-3 gap-8">
-              {/* Brand Section */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-primary/20 ring-2 ring-primary/30">
-                    <Leaf className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg text-foreground">
-                      AgriSense
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Smart Farming Platform
-                    </p>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Ağıllı kənd təsərrüfatı həlləri ilə məhsuldarlığınızı artırın.
-                  Real-time data, AI tövsiyələri və dəqiq proqnozlar.
-                </p>
-              </div>
-
-              {/* Features Section */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-foreground flex items-center gap-2">
-                  <Sprout className="h-4 w-4 text-primary" />
-                  Xüsusiyyətlər
-                </h4>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <Cloud className="h-4 w-4 text-primary/70" />7 günlük hava
-                    proqnozu
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Database className="h-4 w-4 text-primary/70" />
-                    Firebase sensor inteqrasiyası
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Bot className="h-4 w-4 text-primary/70" />
-                    AI-powered tövsiyələr
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-primary/70" />
-                    GPS məkan izləmə
-                  </li>
-                </ul>
-              </div>
-
-              {/* Stats Section */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-foreground flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-primary" />
-                  Statistika
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-lg bg-card border border-border/50">
-                    <p className="text-2xl font-bold text-primary">12+</p>
-                    <p className="text-xs text-muted-foreground">Bitki növü</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-card border border-border/50">
-                    <p className="text-2xl font-bold text-primary">7</p>
-                    <p className="text-xs text-muted-foreground">
-                      Günlük proqnoz
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-card border border-border/50">
-                    <p className="text-2xl font-bold text-primary">24/7</p>
-                    <p className="text-xs text-muted-foreground">
-                      Live monitoring
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-card border border-border/50">
-                    <p className="text-2xl font-bold text-primary">AI</p>
-                    <p className="text-xs text-muted-foreground">
-                      Ağıllı məsləhətlər
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom Bar */}
-            <div className="mt-8 pt-6 border-t border-border/50 flex flex-col md:flex-row items-center justify-between gap-4">
-              <p className="text-sm text-muted-foreground">
-                2024 AgriSense. Bütün hüquqlar qorunur.
-              </p>
-              <div className="flex items-center gap-4">
-                <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  Sistem aktiv
-                </span>
-                <span className="text-xs text-muted-foreground">v1.0.0</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
+const ProgressBar = ({ currentStepIndex }: { currentStepIndex: number }) => {
+  return (
+    <div className="mb-8">
+      <div className="flex justify-between text-sm text-muted-foreground mb-2">
+        <span>
+          Addım {currentStepIndex + 1} / {steps.length}
+        </span>
+        <span>{steps[currentStepIndex].label}</span>
+      </div>
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
+        <div
+          className="h-full bg-primary transition-all duration-300"
+          style={{
+            width: `${((currentStepIndex + 1) / steps.length) * 100}%`,
+          }}
+        />
+      </div>
     </div>
   );
-}
+};
+
+const NavigationButtons = ({
+  currentStepIndex,
+  goToNextStep,
+  goToPrevStep,
+  canProceed,
+  setCurrentStep,
+}: {
+  currentStepIndex: number;
+  goToNextStep: () => void;
+  goToPrevStep: () => void;
+  canProceed: () => boolean;
+  setCurrentStep: (step: AppStep) => void;
+}) => {
+  return (
+    <div className="max-w-4xl mx-auto mt-8 flex justify-between">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={goToPrevStep}
+        disabled={currentStepIndex === 0}
+        className="gap-2 bg-transparent"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Geri
+      </Button>
+
+      {currentStepIndex < steps.length - 1 ? (
+        <Button
+          type="button"
+          onClick={goToNextStep}
+          disabled={!canProceed()}
+          className="gap-2"
+        >
+          Davam et
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          onClick={() => setCurrentStep("location")}
+          variant="outline"
+          className="gap-2"
+        >
+          Yenidən başla
+        </Button>
+      )}
+    </div>
+  );
+};

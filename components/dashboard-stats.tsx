@@ -1,338 +1,342 @@
-'use client'
+"use client";
 
-import { useEffect, useState, useMemo } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp, TrendingDown, Minus, Droplets, Thermometer, Wind, Sun, Leaf, RefreshCw } from 'lucide-react'
-import { WeatherData, FirebaseSensorData, Crop } from '@/lib/types'
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
-import { Badge } from '@/components/ui/badge'
-
-// Fixed colors for charts that work in both light and dark mode
-const CHART_COLORS = {
-  temp: '#f59e0b',
-  humidity: '#3b82f6', 
-  soil: '#22c55e',
-  primary: '#16a34a'
-}
+import { useEffect, useMemo, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Droplets,
+  Thermometer,
+  Wind,
+  Sun,
+  CloudRain,
+  Leaf,
+  RefreshCw,
+  CalendarDays,
+} from "lucide-react";
+import type { WeatherData, FirebaseSensorData, Crop } from "@/lib/types";
 
 interface DashboardStatsProps {
-  weather?: WeatherData
-  sensorData?: FirebaseSensorData
-  forecast?: WeatherData[]
-  crop?: Crop
+  weather?: WeatherData; // currentWeather
+  sensorData?: FirebaseSensorData; // optional
+  forecast?: WeatherData[]; // 7 days
+  crop?: Crop;
+  dayIndex?: number; // controlled (optional)
+  onDayIndexChange?: (index: number) => void; // controlled (optional)
 }
 
-export function DashboardStats({ weather, sensorData, forecast, crop }: DashboardStatsProps) {
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
-  
-  // Update timestamp when data changes
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function formatDateLabel(dateStr: string) {
+  const d = new Date(dateStr);
+  const wd = d.toLocaleDateString("az-AZ", { weekday: "long" });
+  const dm = d.toLocaleDateString("az-AZ", { day: "2-digit", month: "long" });
+  return `${wd}, ${dm}`;
+}
+
+export function DashboardStats({
+  weather,
+  sensorData,
+  forecast = [],
+  crop,
+  dayIndex,
+  onDayIndexChange,
+}: DashboardStatsProps) {
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  // uncontrolled fallback
+  const [internalIndex, setInternalIndex] = useState(0);
+  const activeIndex = typeof dayIndex === "number" ? dayIndex : internalIndex;
+
+  const setIndex = (next: number) => {
+    const safe = clamp(next, 0, Math.max(0, forecast.length - 1));
+    onDayIndexChange?.(safe);
+    if (typeof dayIndex !== "number") setInternalIndex(safe);
+  };
+
   useEffect(() => {
-    setLastUpdate(new Date())
-  }, [weather, sensorData, forecast])
+    setLastUpdate(new Date());
+  }, [weather, sensorData, forecast, crop, activeIndex]);
 
-  // Memoize current values to prevent unnecessary recalculations
-  const currentTemp = useMemo(() => sensorData?.airTemperature || weather?.temp || 0, [sensorData?.airTemperature, weather?.temp])
-  const currentHumidity = useMemo(() => sensorData?.humidity || weather?.humidity || 0, [sensorData?.humidity, weather?.humidity])
-  const soilMoisture = useMemo(() => sensorData?.soilMoisture || weather?.soilMoisture || 0, [sensorData?.soilMoisture, weather?.soilMoisture])
+  // ✅ selected day (forecast based)
+  const day = forecast[activeIndex];
 
-  // Calculate trends
-  const getTrend = (current: number, optimal: { min: number; max: number }) => {
-    if (current < optimal.min) return 'low'
-    if (current > optimal.max) return 'high'
-    return 'optimal'
-  }
+  // ✅ “Current KPI” yalnız bu gün üçün sensor üstün tutulsun,
+  // amma sabah/sonrakılar 100% forecastdan getsin
+  const isToday = activeIndex === 0;
 
-  const tempTrend = crop ? getTrend(currentTemp, crop.optimalTemp) : 'optimal'
-  const humidityTrend = crop ? getTrend(currentHumidity, crop.optimalHumidity) : 'optimal'
+  const shownTemp = isToday
+    ? (sensorData?.airTemperature ?? weather?.temp ?? day?.temp ?? 0)
+    : (day?.temp ?? 0);
 
-  // Prepare chart data from forecast
-  const chartData = forecast?.slice(0, 7).map(day => ({
-    date: new Date(day.date).toLocaleDateString('az-AZ', { weekday: 'short' }),
-    temp: Math.round(day.temp),
-    humidity: day.humidity,
-    soilMoisture: day.soilMoisture || 50,
-    precipitation: day.precipitation
-  })) || []
+  const shownHumidity = isToday
+    ? (sensorData?.humidity ?? weather?.humidity ?? day?.humidity ?? 0)
+    : (day?.humidity ?? 0);
 
-  const TrendIcon = ({ trend }: { trend: string }) => {
-    if (trend === 'low') return <TrendingDown className="h-4 w-4 text-blue-500" />
-    if (trend === 'high') return <TrendingUp className="h-4 w-4 text-orange-500" />
-    return <Minus className="h-4 w-4 text-primary" />
-  }
+  const shownSoil = isToday
+    ? (sensorData?.soilMoisture ??
+      weather?.soilMoisture ??
+      day?.soilMoisture ??
+      0)
+    : (day?.soilMoisture ?? 0);
 
-  // Calculate overall health score
-  const overallHealth = useMemo(() => {
-    if (!crop) return 0
-    const tempScore = Math.max(0, 100 - Math.abs(currentTemp - (crop.optimalTemp.min + crop.optimalTemp.max) / 2) * 5)
-    const humidityScore = Math.max(0, 100 - Math.abs(currentHumidity - (crop.optimalHumidity.min + crop.optimalHumidity.max) / 2) * 2)
-    const soilScore = Math.max(0, 100 - Math.abs(soilMoisture - 55) * 2)
-    return Math.round((tempScore + humidityScore + soilScore) / 3)
-  }, [crop, currentTemp, currentHumidity, soilMoisture])
+  const shownWind = isToday
+    ? (weather?.windSpeed ?? day?.windSpeed ?? 0)
+    : (day?.windSpeed ?? 0);
+  const shownUv = isToday ? (weather?.uvIndex ?? day?.uvIndex) : day?.uvIndex;
+
+  const title = useMemo(() => {
+    if (!day) return "Günlük Analiz";
+    return activeIndex === 0 ? "Bu gün" : formatDateLabel(day.date);
+  }, [day, activeIndex]);
+
+  const healthBadge = useMemo(() => {
+    if (!crop) return null;
+
+    const tempMid = (crop.optimalTemp.min + crop.optimalTemp.max) / 2;
+    const humMid = (crop.optimalHumidity.min + crop.optimalHumidity.max) / 2;
+
+    const tempScore = clamp(100 - Math.abs(shownTemp - tempMid) * 6, 0, 100);
+    const humScore = clamp(
+      100 - Math.abs(shownHumidity - humMid) * 2.2,
+      0,
+      100,
+    );
+
+    const soilScore =
+      shownSoil < 40
+        ? clamp(100 - (40 - shownSoil) * 4, 0, 100)
+        : shownSoil > 70
+          ? clamp(100 - (shownSoil - 70) * 4, 0, 100)
+          : 100;
+
+    const total = Math.round(
+      tempScore * 0.42 + humScore * 0.33 + soilScore * 0.25,
+    );
+
+    const variant: "default" | "secondary" | "destructive" =
+      total >= 70 ? "default" : total >= 45 ? "secondary" : "destructive";
+
+    return { total, variant };
+  }, [crop, shownTemp, shownHumidity, shownSoil]);
+
+  const hasPrev = activeIndex > 0;
+  const hasNext = activeIndex < forecast.length - 1;
 
   return (
-    <div className="space-y-6">
-      {/* Live Status Bar */}
-      <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-sm text-muted-foreground">Canlı məlumatlar</span>
-        </div>
-        <div className="flex items-center gap-4">
-          {crop && (
-            <Badge variant={overallHealth >= 70 ? "default" : overallHealth >= 40 ? "secondary" : "destructive"}>
-              Ümumi sağlamlıq: {overallHealth}%
-            </Badge>
-          )}
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <RefreshCw className="h-3 w-3" />
-            Son yenilənmə: {lastUpdate.toLocaleTimeString('az-AZ')}
-          </span>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-border/50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <Thermometer className="h-8 w-8 text-orange-500" />
-              <TrendIcon trend={tempTrend} />
-            </div>
-            <p className="text-2xl font-bold mt-2 text-foreground">{currentTemp.toFixed(1)}°C</p>
-            <p className="text-sm text-muted-foreground">Temperatur</p>
-            {crop && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Optimal: {crop.optimalTemp.min}-{crop.optimalTemp.max}°C
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <Wind className="h-8 w-8 text-blue-400" />
-              <TrendIcon trend={humidityTrend} />
-            </div>
-            <p className="text-2xl font-bold mt-2 text-foreground">{currentHumidity.toFixed(0)}%</p>
-            <p className="text-sm text-muted-foreground">Hava Rütubəti</p>
-            {crop && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Optimal: {crop.optimalHumidity.min}-{crop.optimalHumidity.max}%
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <Droplets className="h-8 w-8 text-primary" />
-              <TrendIcon trend={soilMoisture < 40 ? 'low' : soilMoisture > 70 ? 'high' : 'optimal'} />
-            </div>
-            <p className="text-2xl font-bold mt-2 text-foreground">{soilMoisture.toFixed(0)}%</p>
-            <p className="text-sm text-muted-foreground">Torpaq Nəmliyi</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Optimal: 40-70%
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <Sun className="h-8 w-8 text-yellow-500" />
-              <Leaf className="h-4 w-4 text-primary" />
-            </div>
-            <p className="text-2xl font-bold mt-2 text-foreground">{weather?.uvIndex?.toFixed(1) || 'N/A'}</p>
-            <p className="text-sm text-muted-foreground">UV İndeksi</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {(weather?.uvIndex || 0) <= 2 ? 'Aşağı' : (weather?.uvIndex || 0) <= 5 ? 'Orta' : 'Yüksək'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts */}
-      {chartData.length > 0 && (
-        <div className="grid md:grid-cols-2 gap-4">
-          <Card className="border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base text-foreground">Temperatur Proqnozu</CardTitle>
-              <CardDescription>7 günlük temperatur dəyişikliyi</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData}>
-                    <defs>
-                      <linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={CHART_COLORS.temp} stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor={CHART_COLORS.temp} stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <XAxis 
-                      dataKey="date" 
-                      tick={{ fontSize: 12 }}
-                      axisLine={false}
-                      tickLine={false}
-                      className="fill-muted-foreground"
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={30}
-                      className="fill-muted-foreground"
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'var(--color-card)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: '8px',
-                        color: 'var(--color-foreground)'
-                      }}
-                      labelStyle={{ color: 'var(--color-foreground)' }}
-                      itemStyle={{ color: CHART_COLORS.temp }}
-                      formatter={(value: number) => [`${value}°C`, 'Temperatur']}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="temp" 
-                      stroke={CHART_COLORS.temp}
-                      fill="url(#tempGradient)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base text-foreground">Rütubət və Torpaq Nəmliyi</CardTitle>
-              <CardDescription>7 günlük dəyişiklik</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <XAxis 
-                      dataKey="date" 
-                      tick={{ fontSize: 12 }}
-                      axisLine={false}
-                      tickLine={false}
-                      className="fill-muted-foreground"
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={30}
-                      className="fill-muted-foreground"
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'var(--color-card)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: '8px',
-                        color: 'var(--color-foreground)'
-                      }}
-                      labelStyle={{ color: 'var(--color-foreground)' }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="humidity" 
-                      stroke={CHART_COLORS.humidity}
-                      strokeWidth={2}
-                      dot={false}
-                      name="Rütubət %"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="soilMoisture" 
-                      stroke={CHART_COLORS.soil}
-                      strokeWidth={2}
-                      dot={false}
-                      name="Torpaq Nəmliyi %"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Crop Health Score */}
-      {crop && (
-        <Card className="border-border/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2 text-foreground">
-              <span className="text-2xl">{crop.icon}</span>
-              {crop.nameAz} - Sağlamlıq Xalı
+    <Card className="border-border/50 shadow-lg overflow-hidden">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <CalendarDays className="h-5 w-5 text-primary" />
+              {title}
             </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Temperature Score */}
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Temperatur uyğunluğu</span>
-                  <span className="font-medium text-foreground">
-                    {Math.max(0, 100 - Math.abs(currentTemp - (crop.optimalTemp.min + crop.optimalTemp.max) / 2) * 5).toFixed(0)}%
-                  </span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary rounded-full transition-all"
-                    style={{ 
-                      width: `${Math.max(0, 100 - Math.abs(currentTemp - (crop.optimalTemp.min + crop.optimalTemp.max) / 2) * 5)}%` 
-                    }}
-                  />
-                </div>
-              </div>
+            <CardDescription className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <RefreshCw className="h-3 w-3" />
+                Yeniləndi: {lastUpdate.toLocaleTimeString("az-AZ")}
+              </span>
 
-              {/* Humidity Score */}
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Rütubət uyğunluğu</span>
-                  <span className="font-medium text-foreground">
-                    {Math.max(0, 100 - Math.abs(currentHumidity - (crop.optimalHumidity.min + crop.optimalHumidity.max) / 2) * 2).toFixed(0)}%
-                  </span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-chart-3 rounded-full transition-all"
-                    style={{ 
-                      width: `${Math.max(0, 100 - Math.abs(currentHumidity - (crop.optimalHumidity.min + crop.optimalHumidity.max) / 2) * 2)}%` 
-                    }}
-                  />
-                </div>
-              </div>
+              {crop && healthBadge && (
+                <Badge variant={healthBadge.variant}>
+                  {crop.nameAz} • Sağlamlıq: {healthBadge.total}%
+                </Badge>
+              )}
 
-              {/* Soil Moisture Score */}
+              {isToday && sensorData && (
+                <Badge variant="secondary" className="gap-1">
+                  <Leaf className="h-3.5 w-3.5" />
+                  Sensor prioritet
+                </Badge>
+              )}
+            </CardDescription>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setIndex(activeIndex - 1)}
+              disabled={!hasPrev}
+              title="Əvvəlki gün"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <div className="px-3 py-1.5 rounded-full border border-border bg-muted/30 text-xs text-muted-foreground">
+              {activeIndex + 1}/{forecast.length || 1}
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setIndex(activeIndex + 1)}
+              disabled={!hasNext}
+              title="Sonrakı gün"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Hero row */}
+        <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="text-5xl">{day?.icon ?? "⛅"}</div>
               <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Torpaq nəmliyi uyğunluğu</span>
-                  <span className="font-medium text-foreground">
-                    {Math.max(0, 100 - Math.abs(soilMoisture - 55) * 2).toFixed(0)}%
-                  </span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-chart-2 rounded-full transition-all"
-                    style={{ 
-                      width: `${Math.max(0, 100 - Math.abs(soilMoisture - 55) * 2)}%` 
-                    }}
-                  />
-                </div>
+                <p className="text-4xl font-extrabold text-foreground">
+                  {Math.round(day?.tempMax ?? shownTemp)}° /{" "}
+                  {Math.round(day?.tempMin ?? shownTemp)}°
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {day?.description ?? weather?.description ?? "—"}
+                </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  )
+
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="flex items-center gap-2">
+                <Thermometer className="h-4 w-4 text-primary" />
+                <span className="text-muted-foreground">
+                  Orta:{" "}
+                  <span className="text-foreground font-semibold">
+                    {Math.round(shownTemp)}°C
+                  </span>
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Droplets className="h-4 w-4 text-primary" />
+                <span className="text-muted-foreground">
+                  Rütubət:{" "}
+                  <span className="text-foreground font-semibold">
+                    {Math.round(shownHumidity)}%
+                  </span>
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Wind className="h-4 w-4 text-primary" />
+                <span className="text-muted-foreground">
+                  Külək:{" "}
+                  <span className="text-foreground font-semibold">
+                    {Math.round(shownWind)} km/saat
+                  </span>
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Sun className="h-4 w-4 text-primary" />
+                <span className="text-muted-foreground">
+                  UV:{" "}
+                  <span className="text-foreground font-semibold">
+                    {typeof shownUv === "number" ? shownUv.toFixed(1) : "N/A"}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Details cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-border/60 bg-card/40 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Leaf className="h-4 w-4 text-primary" />
+              Torpaq nəmliyi
+            </div>
+            <p className="mt-2 text-3xl font-extrabold text-foreground">
+              {shownSoil ? `${Math.round(shownSoil)}%` : "—"}
+            </p>
+            <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full bg-primary"
+                style={{ width: `${clamp(shownSoil || 0, 0, 100)}%` }}
+              />
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {isToday && sensorData
+                ? "Sensor datası varsa prioritet odur."
+                : "Hava məlumatından təxmini hesablanır."}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-card/40 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <CloudRain className="h-4 w-4 text-primary" />
+              Yağış
+            </div>
+            <p className="mt-2 text-3xl font-extrabold text-foreground">
+              {typeof day?.precipitation === "number"
+                ? `${Math.round(day.precipitation)} mm`
+                : "—"}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {typeof day?.precipitation === "number" && day.precipitation >= 5
+                ? "Yağış ehtimalı yüksəkdir — suvarmanı azalt."
+                : "Yağış azdır — suvarma planını nəzərdən keçir."}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-card/40 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Thermometer className="h-4 w-4 text-primary" />
+              Bitki üçün uyğunluq
+            </div>
+
+            {!crop ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Bitki seçsən, uyğunluq analizi daha dəqiq olacaq.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Temp aralığı</span>
+                  <Badge
+                    variant={
+                      shownTemp < crop.optimalTemp.min ||
+                      shownTemp > crop.optimalTemp.max
+                        ? "destructive"
+                        : "default"
+                    }
+                  >
+                    {crop.optimalTemp.min}–{crop.optimalTemp.max}°C
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Rütubət aralığı</span>
+                  <Badge
+                    variant={
+                      shownHumidity < crop.optimalHumidity.min ||
+                      shownHumidity > crop.optimalHumidity.max
+                        ? "destructive"
+                        : "default"
+                    }
+                  >
+                    {crop.optimalHumidity.min}–{crop.optimalHumidity.max}%
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Bu analiz seçilmiş günün göstəricilərinə əsaslanır.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }

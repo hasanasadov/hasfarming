@@ -1,76 +1,112 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Cloud, Droplets, Wind, Sun, Thermometer, RefreshCw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Location, WeatherData } from '@/lib/types'
+import { useEffect, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Cloud,
+  Droplets,
+  Wind,
+  Sun,
+  Thermometer,
+  RefreshCw,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import type { Location, WeatherData } from "@/lib/types";
 
 interface WeatherDisplayProps {
-  location: Location
-  onWeatherData: (current: WeatherData, forecast: WeatherData[]) => void
+  location: Location;
+  onWeatherData: (current: WeatherData, forecast: WeatherData[]) => void;
 }
 
-export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps) {
-  const [currentWeather, setCurrentWeather] = useState<WeatherData | null>(null)
-  const [forecast, setForecast] = useState<WeatherData[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+export function WeatherDisplay({
+  location,
+  onWeatherData,
+}: WeatherDisplayProps) {
+  const [currentWeather, setCurrentWeather] = useState<WeatherData | null>(
+    null,
+  );
+  const [forecast, setForecast] = useState<WeatherData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   const fetchWeather = async () => {
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const response = await fetch(`/api/weather?lat=${location.lat}&lng=${location.lng}`)
-      
-      if (!response.ok) {
-        throw new Error('Hava məlumatları alına bilmədi')
-      }
+      const response = await fetch(
+        `/api/weather?lat=${location.lat}&lng=${location.lng}`,
+        {
+          cache: "no-store",
+        },
+      );
 
-      const data = await response.json()
-      
+      if (!response.ok) throw new Error("Hava məlumatları alına bilmədi");
+
+      const data = await response.json();
+
+      // Sənin API: data.current + data.forecast qaytarır
+      const todayForecast = data.forecast?.[0];
+
       const current: WeatherData = {
-        date: new Date().toISOString().split('T')[0],
+        date: new Date().toISOString().split("T")[0],
         temp: data.current.temp,
-        tempMin: data.forecast[0]?.tempMin || data.current.temp - 5,
-        tempMax: data.forecast[0]?.tempMax || data.current.temp + 5,
+        tempMin: todayForecast?.tempMin ?? data.current.temp - 3,
+        tempMax: todayForecast?.tempMax ?? data.current.temp + 3,
         humidity: data.current.humidity,
         precipitation: data.current.precipitation,
         windSpeed: data.current.windSpeed,
+        uvIndex: data.current.uvIndex,
         description: data.current.description,
         icon: data.current.icon,
-        soilMoisture: data.forecast[0]?.soilMoisture || 50,
-        uvIndex: data.current.uvIndex
-      }
+        soilMoisture: todayForecast?.soilMoisture ?? 50,
+      };
 
-      setCurrentWeather(current)
-      setForecast(data.forecast)
-      setLastUpdate(new Date())
-      onWeatherData(current, data.forecast)
+      setCurrentWeather(current);
+      setForecast(Array.isArray(data.forecast) ? data.forecast : []);
+      setLastUpdate(new Date());
+      onWeatherData(current, Array.isArray(data.forecast) ? data.forecast : []);
     } catch (err) {
-      console.error('Weather fetch error:', err)
-      setError('Hava məlumatları yüklənə bilmədi')
+      console.error("Weather fetch error:", err);
+      setError("Hava məlumatları yüklənə bilmədi");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchWeather()
-    
-    // Refresh every 10 minutes
-    const interval = setInterval(fetchWeather, 10 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [location.lat, location.lng])
+    fetchWeather();
+    const interval = setInterval(fetchWeather, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.lat, location.lng]);
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    const days = ['Baz', 'B.e', 'Ç.a', 'Ç', 'C.a', 'C', 'Ş']
-    return days[date.getDay()]
-  }
+  const formatDayLabel = (dateStr: string, index: number) => {
+    if (index === 0) return "Bu gün";
+    const d = new Date(dateStr);
+    const days = ["Baz", "B.e", "Ç.a", "Ç", "C.a", "C", "Ş"];
+    return days[d.getDay()];
+  };
+
+  const formatDateShort = (dateStr: string) => {
+    const d = new Date(dateStr);
+    // AZ format qısa: 23.01
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${dd}.${mm}`;
+  };
+
+  // UI helpers
+  const val = (x: any, fallback = "N/A") =>
+    x === null || x === undefined || Number.isNaN(x) ? fallback : x;
 
   if (isLoading && !currentWeather) {
     return (
@@ -80,15 +116,15 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
           <Skeleton className="h-4 w-32" />
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-24" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[...Array(2)].map((_, i) => (
+              <Skeleton key={i} className="h-44" />
             ))}
           </div>
-          <Skeleton className="h-32" />
+          <Skeleton className="h-52" />
         </CardContent>
       </Card>
-    )
+    );
   }
 
   if (error) {
@@ -104,96 +140,213 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
-    <Card className="border-border/50 shadow-lg">
+    <Card className="border-border/50 shadow-lg overflow-hidden">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <CardTitle className="flex items-center gap-2 text-foreground">
               <Cloud className="h-5 w-5 text-primary" />
-              Cari Hava Şəraiti
+              Hava & Torpaq Məlumatları
             </CardTitle>
             <CardDescription>
               {location.address}
               {lastUpdate && (
                 <span className="ml-2 text-xs">
-                  (Yeniləndi: {lastUpdate.toLocaleTimeString('az-AZ')})
+                  (Yeniləndi: {lastUpdate.toLocaleTimeString("az-AZ")})
                 </span>
               )}
             </CardDescription>
           </div>
-          <Button variant="ghost" size="icon" onClick={fetchWeather} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={fetchWeather}
+            disabled={isLoading}
+            title="Yenilə"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+            />
           </Button>
         </div>
       </CardHeader>
+
       <CardContent className="space-y-6">
+        {/* 1) CURRENT (böyük kart) */}
         {currentWeather && (
-          <>
-            {/* Current Weather */}
-            <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 border border-primary/10">
+          <div className="rounded-2xl border border-primary/15 bg-primary/5 p-5">
+            <div className="flex items-start justify-between gap-6">
               <div className="flex items-center gap-4">
                 <span className="text-5xl">{currentWeather.icon}</span>
                 <div>
-                  <p className="text-4xl font-bold text-foreground">{Math.round(currentWeather.temp)}°C</p>
-                  <p className="text-muted-foreground">{currentWeather.description}</p>
+                  <p className="text-4xl font-bold text-foreground">
+                    {Math.round(currentWeather.temp)}°C
+                  </p>
+                  <p className="text-muted-foreground">
+                    {currentWeather.description}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatDateShort(currentWeather.date)} • Bu gün (cari)
+                  </p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                 <div className="flex items-center gap-2">
                   <Thermometer className="h-4 w-4 text-accent" />
                   <span className="text-muted-foreground">
-                    {Math.round(currentWeather.tempMin)}° / {Math.round(currentWeather.tempMax)}°
+                    Min/Max: {Math.round(currentWeather.tempMin)}° /{" "}
+                    {Math.round(currentWeather.tempMax)}°
                   </span>
                 </div>
+
                 <div className="flex items-center gap-2">
                   <Droplets className="h-4 w-4 text-primary" />
-                  <span className="text-muted-foreground">{currentWeather.humidity}%</span>
+                  <span className="text-muted-foreground">
+                    Hava rütubəti: {Math.round(currentWeather.humidity)}%
+                  </span>
                 </div>
+
                 <div className="flex items-center gap-2">
                   <Wind className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">{Math.round(currentWeather.windSpeed)} km/s</span>
+                  <span className="text-muted-foreground">
+                    Külək: {Math.round(currentWeather.windSpeed)} km/saat
+                  </span>
                 </div>
+
                 <div className="flex items-center gap-2">
                   <Sun className="h-4 w-4 text-accent" />
-                  <span className="text-muted-foreground">UV: {currentWeather.uvIndex?.toFixed(1) || 'N/A'}</span>
+                  <span className="text-muted-foreground">
+                    UV: {val(currentWeather.uvIndex, "N/A")}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Cloud className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">
+                    Yağıntı: {val(currentWeather.precipitation, "0")} mm
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Droplets className="h-4 w-4 text-primary" />
+                  <span className="text-muted-foreground">
+                    Torpaq nəmliyi:{" "}
+                    {val(Math.round(currentWeather.soilMoisture ?? 0), "N/A")}%
+                  </span>
                 </div>
               </div>
             </div>
-
-            {/* 7-Day Forecast */}
-            <div>
-              <h3 className="font-semibold text-foreground mb-3">7 Günlük Proqnoz</h3>
-              <div className="grid grid-cols-7 gap-2">
-                {forecast.map((day, index) => (
-                  <div
-                    key={day.date}
-                    className={`text-center p-3 rounded-lg border transition-colors ${
-                      index === 0 
-                        ? 'bg-primary/10 border-primary/30' 
-                        : 'bg-card border-border hover:border-primary/30'
-                    }`}
-                  >
-                    <p className="text-xs font-medium text-muted-foreground mb-1">
-                      {index === 0 ? 'Bu gün' : formatDate(day.date)}
-                    </p>
-                    <span className="text-2xl block my-1">{day.icon}</span>
-                    <p className="text-sm font-bold text-foreground">{Math.round(day.tempMax)}°</p>
-                    <p className="text-xs text-muted-foreground">{Math.round(day.tempMin)}°</p>
-                    <div className="mt-1 flex items-center justify-center gap-1">
-                      <Droplets className="h-3 w-3 text-primary" />
-                      <span className="text-xs text-muted-foreground">{Math.round(day.soilMoisture || 0)}%</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
+          </div>
         )}
+
+        {/* 2) 7 GÜNLÜK — hamısı “Bu gün” kimi BÖYÜK */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-foreground">
+              7 Günlük Proqnoz (bütün metriklərlə)
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Torpaq nəmliyi: hava+yağıntı əsasında təxmini (sensor varsa,
+              sensor daha dəqiqdir)
+            </p>
+          </div>
+
+          {/* Horizontal scroll, böyük kartlar */}
+          <div className="flex gap-4 overflow-x-auto pb-2 pr-1 [scrollbar-width:thin]">
+            {forecast.map((day, index) => (
+              <div
+                key={day.date}
+                className={`min-w-[320px] sm:min-w-[360px] rounded-2xl border p-5 shadow-sm transition-colors ${
+                  index === 0
+                    ? "border-primary/30 bg-primary/10"
+                    : "border-border bg-card hover:border-primary/25"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {formatDayLabel(day.date, index)}
+                      <span className="text-xs text-muted-foreground font-normal ml-2">
+                        {formatDateShort(day.date)}
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                      {day.description}
+                    </p>
+                  </div>
+
+                  <span className="text-4xl leading-none">{day.icon}</span>
+                </div>
+
+                <div className="mt-4 flex items-end justify-between">
+                  <div>
+                    <p className="text-4xl font-bold text-foreground">
+                      {Math.round(day.tempMax)}°
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Min: {Math.round(day.tempMin)}°
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Orta</p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {Math.round(day.temp)}°C
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Droplets className="h-4 w-4 text-primary" />
+                    <span className="text-muted-foreground">
+                      Hava rütubəti: {val(Math.round(day.humidity ?? 0), "N/A")}
+                      %
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Cloud className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">
+                      Yağıntı: {val(day.precipitation, "N/A")} mm
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Wind className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">
+                      Külək: {val(Math.round(day.windSpeed ?? 0), "N/A")}{" "}
+                      km/saat
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Sun className="h-4 w-4 text-accent" />
+                    <span className="text-muted-foreground">
+                      UV: {val(day.uvIndex, "N/A")}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 col-span-2">
+                    <Droplets className="h-4 w-4 text-primary" />
+                    <span className="text-muted-foreground">
+                      Torpaq nəmliyi:{" "}
+                      {val(Math.round(day.soilMoisture ?? 0), "N/A")}%{" "}
+                      <span className="text-xs opacity-70">(təxmini)</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </CardContent>
     </Card>
-  )
+  );
 }

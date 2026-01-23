@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
+import Footer from "@/components/footer";
 
 const _inter = Inter({ subsets: ["latin"] });
 
@@ -58,7 +59,10 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem={false}
         >
-          {children}
+          <>
+            {children}
+            <Footer />
+          </>
         </ThemeProvider>
         <Analytics />
       </body>

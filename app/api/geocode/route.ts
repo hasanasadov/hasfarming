@@ -1,68 +1,121 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from "next/server";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function toNumber(v: string | null) {
+  if (!v) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatCoords(lat: number, lng: number) {
+  const ns = lat >= 0 ? "N" : "S";
+  const ew = lng >= 0 ? "E" : "W";
+  return `${Math.abs(lat).toFixed(5)}°${ns}, ${Math.abs(lng).toFixed(5)}°${ew}`;
+}
+
+function pickFirst(...vals: Array<any>) {
+  return vals.find(
+    (v) => v !== undefined && v !== null && String(v).trim() !== "",
+  );
+}
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const lat = searchParams.get('lat')
-  const lng = searchParams.get('lng')
+  const sp = request.nextUrl.searchParams;
+  const lat = toNumber(sp.get("lat"));
+  const lng = toNumber(sp.get("lng"));
 
-  if (!lat || !lng) {
-    return NextResponse.json({ error: 'Latitude and longitude are required' }, { status: 400 })
+  if (lat === null || lng === null) {
+    return NextResponse.json(
+      { error: "Latitude and longitude are required (valid numbers)." },
+      { status: 400 },
+    );
   }
 
-  const coordsAddress = `${Number(lat).toFixed(4)}°N, ${Number(lng).toFixed(4)}°E`
+  const coordsAddress = formatCoords(lat, lng);
 
   try {
-    // Use Open-Meteo geocoding API - free, no API key, server-side compatible
-    const response = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${lat},${lng}&count=1&language=en&format=json`,
-      { cache: 'no-store' }
-    )
+    const url =
+      `https://nominatim.openstreetmap.org/reverse` +
+      `?format=jsonv2&lat=${lat}&lon=${lng}` +
+      `&zoom=18&addressdetails=1&namedetails=1&extratags=1` +
+      `&accept-language=az`;
 
-    // Try Nominatim as primary - it's more reliable for reverse geocoding
-    const nominatimResponse = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=10&accept-language=az`,
-      {
-        headers: {
-          'User-Agent': 'AgriSense/1.0 (Smart Farming Application)',
-          'Accept': 'application/json'
-        },
-        cache: 'no-store'
-      }
-    )
+    const r = await fetch(url, {
+      // 1 gün cache -> rate limit azalır
+      next: { revalidate: 60 * 60 * 24 },
+      headers: {
+        "User-Agent": "AgriSense/1.0 (Smart Farming Application)",
+        Accept: "application/json",
+      },
+    });
 
-    if (nominatimResponse.ok) {
-      const data = await nominatimResponse.json()
-      
-      if (data && data.address) {
-        const address = data.address
-        const displayName = [
-          address.village || address.town || address.city || address.municipality,
-          address.county || address.state || address.region,
-          address.country
-        ].filter(Boolean).join(', ')
-
-        return NextResponse.json({
-          address: displayName || data.display_name || coordsAddress,
-          details: {
-            locality: address.village || address.town || address.city,
-            region: address.county || address.state,
-            country: address.country,
-            countryCode: address.country_code?.toUpperCase()
-          }
-        })
-      }
+    if (!r.ok) {
+      return NextResponse.json({
+        address: coordsAddress,
+        details: { lat, lng },
+      });
     }
 
-    // Fallback to coordinates
+    const data = await r.json();
+    const a = data?.address || {};
+
+    // --- POI name (park, school, hospital, etc.) ---
+    const poi =
+      pickFirst(
+        data?.name, // bəzən gəlir
+        data?.namedetails?.name, // namedetails=1 ilə daha çox gəlir
+        a.park,
+        a.leisure,
+        a.attraction,
+        a.amenity,
+        a.tourism,
+        a.shop,
+        a.building,
+        a.industrial,
+      ) || null;
+
+    // locality: kənd/qəsəbə/şəhər
+    const locality =
+      pickFirst(
+        a.village,
+        a.hamlet,
+        a.town,
+        a.city,
+        a.municipality,
+        a.suburb,
+        a.neighbourhood,
+      ) || null;
+
+    // region: rayon/region
+    const region =
+      pickFirst(a.county, a.state_district, a.state, a.region) || null;
+
+    const country = a.country || null;
+
+    // ✅ Əsas qayda: POI varsa -> başa yaz
+    const addressParts = [poi, locality, region, country].filter(Boolean);
+    const pretty = addressParts.join(", ");
+
+    // fallback: Nominatim-in uzun display_name-i
+    const fallback = data?.display_name || coordsAddress;
+
     return NextResponse.json({
-      address: coordsAddress,
-      details: { lat, lng }
-    })
+      address: pretty || fallback || coordsAddress,
+      details: {
+        poi,
+        locality,
+        region,
+        country,
+        countryCode: a.country_code
+          ? String(a.country_code).toUpperCase()
+          : null,
+        raw: a,
+      },
+    });
   } catch (error) {
-    console.error('Geocoding error:', error)
-    return NextResponse.json({
-      address: coordsAddress,
-      details: { lat, lng }
-    })
+    console.error("Geocoding error:", error);
+    return NextResponse.json({ address: coordsAddress, details: { lat, lng } });
   }
 }
