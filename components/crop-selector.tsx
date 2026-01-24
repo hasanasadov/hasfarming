@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -130,6 +130,16 @@ export function CropSelector({
         return needs;
     }
   };
+  const detailsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (selectedCrop && detailsRef.current) {
+      detailsRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, [selectedCrop]);
 
   const getWaterNeedsBadge = (needs: string) => {
     // Tailwind rəngləri - sənin theme-ə uyğun sakit tonlar
@@ -255,7 +265,10 @@ export function CropSelector({
 
         {/* Selected details */}
         {selectedCrop && (
-          <div className="rounded-2xl border border-primary/20 bg-primary/10 p-5">
+          <div
+            ref={detailsRef}
+            className="rounded-2xl border border-primary/20 bg-primary/10 p-5"
+          >
             <div className="flex flex-col items-start ">
               <div className="flex gap-4">
                 <div className="h-12 w-12 rounded-2xl bg-background/60 ring-1 ring-primary/20 flex items-center justify-center text-3xl">

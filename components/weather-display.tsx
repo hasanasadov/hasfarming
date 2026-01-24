@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Location, WeatherData } from "@/lib/types";
+import Link from "next/link";
 
 interface WeatherDisplayProps {
   location: Location;
@@ -245,15 +246,16 @@ export function WeatherDisplay({
           </div>
         )}
 
-        {/* 2) 7 GÜNLÜK — hamısı “Bu gün” kimi BÖYÜK */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-foreground">
-              7 Günlük Proqnoz (bütün metriklərlə)
+              <p>7 Günlük Proqnoz</p>
+              <span>(sağa sürüşdür)</span>
             </h3>
             <p className="text-xs text-muted-foreground">
-              Torpaq nəmliyi: hava+yağıntı əsasında təxmini (sensor varsa,
-              sensor daha dəqiqdir)
+              <Link href="/settings" className="underline">
+                Sensorum var
+              </Link>
             </p>
           </div>
 

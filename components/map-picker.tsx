@@ -73,12 +73,31 @@ export function MapPicker({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(
     selectedLocation
       ? { lat: selectedLocation.lat, lng: selectedLocation.lng }
       : null,
   );
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const checkSize = () => {
+      if (
+        mapRef.current &&
+        mapRef.current.clientWidth > 0 &&
+        mapRef.current.clientHeight > 0
+      ) {
+        setMapReady(true);
+      }
+    };
+
+    checkSize();
+    window.addEventListener("resize", checkSize);
+    return () => window.removeEventListener("resize", checkSize);
+  }, []);
 
   // drag click fərqləndirmə
   const dragDistance = useRef(0);
@@ -124,7 +143,7 @@ export function MapPicker({
     return tiles;
   }, [centerWorld, zoom]);
 
-  const tiles = getVisibleTiles();
+  const tiles = mapReady ? getVisibleTiles() : [];
 
   const tileToScreen = useCallback(
     (tileX: number, tileY: number) => {
@@ -277,12 +296,31 @@ export function MapPicker({
       <CardContent className="space-y-4">
         <div
           ref={mapRef}
-          className={`relative w-full h-80 md:h-96 rounded-xl overflow-hidden border border-border bg-muted select-none
+          className={`relative w-full touch-none h-80 md:h-96 rounded-xl overflow-hidden border border-border bg-muted select-none
           ${isDragging ? "cursor-grabbing" : "cursor-crosshair"}`}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onPointerDown={(e) => {
+            mapRef.current?.setPointerCapture(e.pointerId);
+            setIsDragging(true);
+            setDragStart({ x: e.clientX, y: e.clientY });
+            dragDistance.current = 0;
+          }}
+          onPointerMove={(e) => {
+            if (!isDragging) return;
+
+            const dx = e.clientX - dragStart.x;
+            const dy = e.clientY - dragStart.y;
+            dragDistance.current += Math.abs(dx) + Math.abs(dy);
+
+            const newCenterWorldX = centerWorld.x - dx;
+            const newCenterWorldY = centerWorld.y - dy;
+
+            const ll = worldPxToLatLng(newCenterWorldX, newCenterWorldY, zoom);
+            setMapCenter(ll);
+
+            setDragStart({ x: e.clientX, y: e.clientY });
+          }}
+          onPointerUp={() => setIsDragging(false)}
+          onPointerCancel={() => setIsDragging(false)}
           onClick={handleClick}
         >
           {/* Tiles */}

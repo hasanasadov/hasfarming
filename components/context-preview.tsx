@@ -6,14 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/lib/store/app-store";
 
 export function ContextPreview() {
-  const {
-    location,
-    selectedCrop,
-    dayIndex,
-    forecast,
-    dataSource,
-    sensorData,
-  } = useAppStore();
+  const { location, selectedCrop, dayIndex, forecast, dataSource, sensorData } =
+    useAppStore();
 
   const d = forecast?.[dayIndex];
 
@@ -22,8 +16,9 @@ export function ContextPreview() {
       <Badge variant="secondary">
         📍 {location?.address?.split(",")[0] ?? "Məkan yoxdur"}
       </Badge>
-      <Badge variant="secondary">
-        🌾 {selectedCrop?.nameAz ?? "Bitki yoxdur"}
+      <Badge className="flex gap-1 items-center" variant="secondary">
+        <div>{selectedCrop?.icon}</div>
+        <div>{selectedCrop?.nameAz ?? "Bitki yoxdur"}</div>
       </Badge>
       <Badge variant="secondary">
         🗓 {dayIndex === 0 ? "Bu gün" : `Gün ${dayIndex + 1}`}
