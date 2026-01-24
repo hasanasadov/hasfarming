@@ -4,13 +4,12 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function normalizeFirebaseUrl(raw: string) {
-  let url = raw.trim();
-
+function normalizeFirebaseBaseUrl(raw: string) {
+  let url = (raw || "").trim();
+  if (!url) return "";
   if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
-  url = url.replace(/\.json$/i, "");
+  url = url.replace(/\.json(\?.*)?$/i, "");
   url = url.replace(/\/+$/g, "");
-
   return url;
 }
 
@@ -20,68 +19,85 @@ function isFirebaseDbUrl(url: string) {
 
 export async function GET(req: NextRequest) {
   const u = req.nextUrl.searchParams.get("url") || "";
-  const url = normalizeFirebaseUrl(u);
+  const base = normalizeFirebaseBaseUrl(u);
 
-  if (!url) {
+  if (!base) {
     return NextResponse.json(
       { ok: false, error: "Firebase URL boşdur" },
       { status: 400 },
     );
   }
-
-  if (!isFirebaseDbUrl(url)) {
+  if (!isFirebaseDbUrl(base)) {
     return NextResponse.json(
       { ok: false, error: "Düzgün Firebase Realtime Database URL deyil" },
       { status: 400 },
     );
   }
 
-  try {
-    const testUrl = `${url}.json?print=silent`;
+  // shallow=true => böyük payload gətirmir, sadəcə mövcudluq yoxlayır
+  const testUrl = `${base}/.json?shallow=true&t=${Date.now()}`;
 
+  try {
     const r = await fetch(testUrl, {
       method: "GET",
       cache: "no-store",
       headers: {
-        // User-Agent brauzerdə yox, serverdə olar
-        "User-Agent": "AgriSense/1.0",
         Accept: "application/json",
+        "User-Agent": "AgriSense/1.0",
       },
     });
 
-    if (r.ok) {
-      return NextResponse.json({
-        ok: true,
-        status: r.status,
-        normalizedUrl: url,
-      });
+    const text = await r.text().catch(() => "");
+    let json: any = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      json = null;
     }
 
-    // Status-a görə mesaj
-    let msg = `Firebase yoxlanıla bilmədi. Status: ${r.status}`;
-    if (r.status === 401 || r.status === 403) {
-      msg =
-        "Firebase icazəsi yoxdur (401/403). Realtime Database Rules (read) yoxlayın.";
-    } else if (r.status === 404) {
-      msg = "Firebase URL tapılmadı (404). URL-i düz yazın.";
-    } else if (r.status === 429) {
-      msg = "Çox sorğu göndərildi (429). Bir az sonra yenidən yoxlayın.";
+    if (!r.ok) {
+      let msg = `Firebase yoxlanıla bilmədi. Status: ${r.status}`;
+      if (r.status === 401 || r.status === 403) {
+        msg =
+          "Firebase icazəsi yoxdur (401/403). Realtime Database Rules (read) yoxlayın.";
+      } else if (r.status === 404) {
+        msg = "Firebase URL tapılmadı (404). URL-i düz yazın.";
+      } else if (r.status === 429) {
+        msg = "Çox sorğu göndərildi (429). Bir az sonra yenidən yoxlayın.";
+      }
+
+      return NextResponse.json(
+        {
+          ok: false,
+          error: msg,
+          status: r.status,
+          normalizedUrl: base,
+          testUrl,
+          bodyPreview: text?.slice(0, 200) || "",
+        },
+        { status: 200 }, // UI rahat parse etsin deyə
+      );
     }
 
+    // ok olsa da payload null ola bilər (tam boş DB)
     return NextResponse.json({
-      ok: false,
+      ok: true,
       status: r.status,
-      error: msg,
-      normalizedUrl: url,
+      normalizedUrl: base,
+      testUrl,
+      shallow: json,
     });
   } catch (e: any) {
-    console.error("Firebase validate error:", e?.message || e);
     return NextResponse.json(
       {
         ok: false,
-        error: "Server Firebase-ə qoşula bilmədi (network/URL problem).",
+        error: "Server Firebase-ə qoşula bilmədi (network/URL/timeout).",
+        normalizedUrl: base,
+        testUrl,
+        name: e?.name || "Error",
+        message: e?.message || "fetch failed",
       },
-      { status: 500 },
+      { status: 200 },
     );
   }
 }

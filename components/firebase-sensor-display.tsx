@@ -23,69 +23,179 @@ import {
   WifiOff,
 } from "lucide-react";
 import type { FirebaseSensorData } from "@/lib/types";
+import { useAppStore } from "@/lib/store/app-store";
 
 interface FirebaseSensorDisplayProps {
-  firebaseUrl: string;
+  firebaseUrl: string; // base url: https://xxx.firebaseio.com
   onSensorData: (data: FirebaseSensorData) => void;
+  onError?: (message: string) => void;
 }
 
-function normalizeFirebaseJsonUrl(raw: string) {
-  let url = raw.trim();
-  if (url && !/^https?:\/\//i.test(url)) url = `https://${url}`;
-  url = url.replace(/\.json$/i, "");
-  url = url.replace(/\/+$/g, "");
-  return `${url}.json`;
+function toNumberOrNull(x: any) {
+  if (x === undefined || x === null) return null;
+  const n = typeof x === "string" ? Number(x) : x;
+  return Number.isFinite(n) ? Number(n) : null;
+}
+
+/**
+ * payload-lar fərqlidir:
+ * - { soil: {...}, isWorking: true }
+ * - { moisture: 70, humidity: 60, temperature: 22, nit: 10, phos: 5, pot: 80 }
+ * - { "-Nx..": {...}, "-Ny..": {...} }  (push id)
+ */
+function pickSensorObject(payload: any) {
+  if (!payload) return null;
+
+  if (payload.soil && typeof payload.soil === "object") return payload.soil;
+  if (payload.data && typeof payload.data === "object") return payload.data;
+  if (payload.readings && typeof payload.readings === "object")
+    return payload.readings;
+
+  const keys = Object.keys(payload);
+  const likely = [
+    "moisture",
+    "humidity",
+    "temperature",
+    "soilMoisture",
+    "soilTemperature",
+    "airTemperature",
+    "ph",
+    "nit",
+    "phos",
+    "pot",
+    "nitrogen",
+    "phosphorus",
+    "potassium",
+    "timestamp",
+  ];
+  if (keys.some((k) => likely.includes(k))) return payload;
+
+  // root push-id strukturu
+  if (keys.length && keys.every((k) => typeof payload[k] === "object")) {
+    const values = keys.map((k) => payload[k]).filter(Boolean);
+    const withTs = values
+      .map((v) => ({
+        v,
+        ts: v?.timestamp ?? v?.time ?? v?.createdAt ?? v?.updatedAt ?? 0,
+      }))
+      .sort((a, b) => Number(b.ts) - Number(a.ts));
+    if (withTs[0]?.v) return withTs[0].v;
+  }
+
+  return null;
+}
+
+function parseSensor(raw: any): FirebaseSensorData {
+  const soilMoisture =
+    toNumberOrNull(raw.soilMoisture) ??
+    toNumberOrNull(raw.soil_moisture) ??
+    toNumberOrNull(raw.moisture) ??
+    toNumberOrNull(raw.soilHumidity) ??
+    toNumberOrNull(raw.soil_humidity) ??
+    50;
+
+  const soilTemperature =
+    toNumberOrNull(raw.soilTemperature) ??
+    toNumberOrNull(raw.soil_temperature) ??
+    toNumberOrNull(raw.soil_temp) ??
+    toNumberOrNull(raw.soilTemp) ??
+    toNumberOrNull(raw.temperature_soil) ??
+    toNumberOrNull(raw.temperature) ??
+    20;
+
+  const airTemperature =
+    toNumberOrNull(raw.airTemperature) ??
+    toNumberOrNull(raw.air_temperature) ??
+    toNumberOrNull(raw.air_temp) ??
+    toNumberOrNull(raw.temp) ??
+    toNumberOrNull(raw.temperature_air) ??
+    toNumberOrNull(raw.temperature) ??
+    25;
+
+  const humidity =
+    toNumberOrNull(raw.humidity) ??
+    toNumberOrNull(raw.air_humidity) ??
+    toNumberOrNull(raw.rh) ??
+    60;
+
+  const ph =
+    toNumberOrNull(raw.ph) ??
+    toNumberOrNull(raw.pH) ??
+    toNumberOrNull(raw.soilPh) ??
+    undefined;
+
+  const nitrogen =
+    toNumberOrNull(raw.nitrogen) ??
+    toNumberOrNull(raw.n) ??
+    toNumberOrNull(raw.nit) ??
+    undefined;
+
+  const phosphorus =
+    toNumberOrNull(raw.phosphorus) ??
+    toNumberOrNull(raw.p) ??
+    toNumberOrNull(raw.phos) ??
+    undefined;
+
+  const potassium =
+    toNumberOrNull(raw.potassium) ??
+    toNumberOrNull(raw.k) ??
+    toNumberOrNull(raw.pot) ??
+    undefined;
+
+  const timestamp =
+    toNumberOrNull(raw.timestamp) ?? toNumberOrNull(raw.time) ?? Date.now();
+
+  return {
+    soilMoisture,
+    soilTemperature,
+    airTemperature,
+    humidity,
+    ph,
+    nitrogen,
+    phosphorus,
+    potassium,
+    timestamp,
+  };
 }
 
 export function FirebaseSensorDisplay({
   firebaseUrl,
   onSensorData,
+  onError,
 }: FirebaseSensorDisplayProps) {
-  const [sensorData, setSensorData] = useState<FirebaseSensorData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const cached = useAppStore((s) => s.sensorData);
+  const lastSensorAt = useAppStore((s) => s.lastSensorAt);
+  const [sensorData, setSensorData] = useState<FirebaseSensorData | null>(
+    cached,
+  );
+  const [isLoading, setIsLoading] = useState(!cached);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const isStale = lastSensorAt ? Date.now() - lastSensorAt > 60_000 : false; // 1 dəqiqə
+
+  const [showRaw, setShowRaw] = useState(false);
+  const [rawPreview, setRawPreview] = useState<any>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<number | null>(null);
-  const backoffRef = useRef<number>(5000); // start 5s
+  const backoffRef = useRef<number>(5000);
 
-  const jsonUrl = useMemo(
-    () => normalizeFirebaseJsonUrl(firebaseUrl),
-    [firebaseUrl],
-  );
-
-  const parseSensor = (data: any): FirebaseSensorData => ({
-    soilMoisture:
-      data.soilMoisture ?? data.soil_moisture ?? data.moisture ?? 50,
-    soilTemperature:
-      data.soilTemperature ?? data.soil_temperature ?? data.soil_temp ?? 20,
-    airTemperature:
-      data.airTemperature ??
-      data.air_temperature ??
-      data.temperature ??
-      data.temp ??
-      25,
-    humidity: data.humidity ?? data.air_humidity ?? 60,
-    ph: data.ph ?? data.pH ?? undefined,
-    nitrogen: data.nitrogen ?? data.n ?? undefined,
-    phosphorus: data.phosphorus ?? data.p ?? undefined,
-    potassium: data.potassium ?? data.k ?? undefined,
-    timestamp: data.timestamp ?? Date.now(),
-  });
+  const base = useMemo(() => (firebaseUrl || "").trim(), [firebaseUrl]);
 
   const scheduleNext = useCallback((ms: number) => {
     if (timerRef.current) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(() => {
-      void fetchSensorData("poll");
-    }, ms);
+    timerRef.current = window.setTimeout(
+      () => void fetchSensorData("poll"),
+      ms,
+    );
   }, []);
 
   const fetchSensorData = useCallback(
     async (mode: "initial" | "manual" | "poll" = "poll") => {
-      // tab hidden olarsa poll etmə
+      if (!base) return;
+
       if (mode === "poll" && document.visibilityState !== "visible") {
         scheduleNext(backoffRef.current);
         return;
@@ -98,22 +208,36 @@ export function FirebaseSensorDisplay({
       if (mode === "manual") setIsRefreshing(true);
 
       try {
-        // cache bust
-        const urlWithTs = `${jsonUrl}?t=${Date.now()}`;
+        const endpoint = `/api/firebase/read?url=${encodeURIComponent(
+          base,
+        )}&t=${Date.now()}`;
 
-        const response = await fetch(urlWithTs, {
+        const res = await fetch(endpoint, {
           method: "GET",
           cache: "no-store",
           signal: abortRef.current.signal,
         });
 
-        if (!response.ok) throw new Error(`Firebase status ${response.status}`);
+        const data = await res.json().catch(() => null);
 
-        const data = await response.json();
+        if (!res.ok || !data) {
+          throw new Error("Server read failed");
+        }
 
-        if (!data) throw new Error("Empty firebase payload");
+        if (!data.ok) {
+          if (showRaw) setRawPreview(data);
+          throw new Error(data.error || "Firebase read returned ok:false");
+        }
 
-        const reading = parseSensor(data);
+        const json = data.payload;
+        const picked = pickSensorObject(json);
+
+        if (!picked) {
+          if (showRaw) setRawPreview(json);
+          throw new Error("No compatible sensor object found");
+        }
+
+        const reading = parseSensor(picked);
 
         setSensorData(reading);
         setLastUpdate(new Date());
@@ -121,38 +245,35 @@ export function FirebaseSensorDisplay({
         setError(null);
         onSensorData(reading);
 
-        // uğurlu oldu → backoff reset (5s)
+        if (showRaw) setRawPreview(json);
+
         backoffRef.current = 5000;
+        scheduleNext(backoffRef.current);
       } catch (err: any) {
         if (err?.name === "AbortError") return;
 
-        console.error("Sensor data fetch error:", err);
-        setError("Firebase-dən məlumat alına bilmədi");
+        const msg =
+          err?.message || "Firebase-dən məlumat alına bilmədi (format/icazə).";
+        setError(msg);
         setIsConnected(false);
+        onError?.(msg);
 
-        // xəta → backoff artır (max 60s)
         backoffRef.current = Math.min(backoffRef.current * 2, 60000);
+        scheduleNext(backoffRef.current);
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
-
-        // növbəti poll
-        scheduleNext(backoffRef.current);
       }
     },
-    [jsonUrl, onSensorData, scheduleNext],
+    [base, onSensorData, onError, scheduleNext, showRaw],
   );
 
   useEffect(() => {
     fetchSensorData("initial");
 
     const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        // geri qayıdanda dərhal yenilə
-        fetchSensorData("poll");
-      }
+      if (document.visibilityState === "visible") fetchSensorData("poll");
     };
-
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
@@ -200,6 +321,7 @@ export function FirebaseSensorDisplay({
               <Database className="h-5 w-5 text-primary" />
               Canlı Sensor Məlumatları
             </CardTitle>
+
             <CardDescription className="flex items-center gap-2 flex-wrap">
               Firebase Realtime Database
               <Badge
@@ -214,7 +336,7 @@ export function FirebaseSensorDisplay({
                 {isConnected ? "Bağlı" : "Bağlantı kəsildi"}
               </Badge>
               <span className="text-xs text-muted-foreground truncate max-w-[520px]">
-                {jsonUrl}
+                {base}
               </span>
             </CardDescription>
           </div>
@@ -228,6 +350,7 @@ export function FirebaseSensorDisplay({
                 })}
               </span>
             )}
+
             <Button
               variant="ghost"
               size="icon"
@@ -238,6 +361,16 @@ export function FirebaseSensorDisplay({
               <RefreshCw
                 className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
               />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowRaw((v) => !v)}
+              className="text-xs"
+              title="Debug (raw JSON)"
+            >
+              {showRaw ? "Debug: ON" : "Debug"}
             </Button>
           </div>
         </div>
@@ -355,15 +488,13 @@ export function FirebaseSensorDisplay({
           </div>
         )}
 
-        <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-border">
-          <p className="text-xs text-muted-foreground">
-            Məlumatlar avtomatik yenilənir. Tab arxa plandadırsa polling
-            dayanır. Rənglər:{" "}
-            <span className="text-primary ml-2">Yaşıl=Optimal</span>,
-            <span className="ml-2">Sarı=Diqqət</span>,
-            <span className="text-destructive ml-2">Qırmızı=Kritik</span>
-          </p>
-        </div>
+        {showRaw && (
+          <div className="mt-4">
+            <pre className="text-xs p-3 rounded-lg bg-muted/50 border overflow-auto max-h-64">
+              {JSON.stringify(rawPreview, null, 2)}
+            </pre>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

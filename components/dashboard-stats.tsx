@@ -56,6 +56,7 @@ export function DashboardStats({
 
   // uncontrolled fallback
   const [internalIndex, setInternalIndex] = useState(0);
+
   const activeIndex = typeof dayIndex === "number" ? dayIndex : internalIndex;
 
   const setIndex = (next: number) => {
@@ -165,6 +166,7 @@ export function DashboardStats({
 
           <div className="flex items-center gap-2">
             <Button
+              className="rounded-full p-1.5 w-fit h-fit cursor-pointer"
               type="button"
               variant="outline"
               size="icon"
@@ -180,6 +182,7 @@ export function DashboardStats({
             </div>
 
             <Button
+              className="rounded-full p-1.5 w-fit h-fit cursor-pointer"
               type="button"
               variant="outline"
               size="icon"

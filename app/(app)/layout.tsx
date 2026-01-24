@@ -2,9 +2,10 @@ import React from "react";
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import "./globals.css";
+import "../globals.css";
 import { ThemeProvider } from "next-themes";
-import Footer from "@/components/footer";
+import { AppShellPro } from "@/components/app-shell-pro";
+import { SensorListener } from "@/components/sensor-listener";
 
 const _inter = Inter({ subsets: ["latin"] });
 
@@ -59,10 +60,8 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem={false}
         >
-          <>
-            {children}
-            <Footer />
-          </>
+          <SensorListener />
+          <AppShellPro>{children}</AppShellPro>
         </ThemeProvider>
         <Analytics />
       </body>
