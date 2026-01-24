@@ -391,16 +391,16 @@ export function AIChat({
   };
 
   return (
-    <Card className="border-border/50 shadow-lg h-[740px] lg:h-[820px] flex flex-col">
-      <CardHeader className="pb-3 border-b bg-muted/30">
+    <Card className="border-border/50 shadow-lg h-[740px] lg:h-[820px] flex flex-col !py-0 !gap-0">
+      <CardHeader className="pb-1 border-b !py-4 !gap-0 flex items-center h-fit">
         <CardTitle className="flex items-center gap-2 text-xl">
           <Bot
             className={`h-6 w-6 ${connectionError ? "text-red-500" : "text-primary"}`}
           />
-          AgriSense AI
+          <div>AgriSense AI</div>
         </CardTitle>
 
-        <CardDescription className="flex flex-col gap-2">
+        {/* <CardDescription className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-muted-foreground">
               Süni intellekt ilə canlı məsləhətləşmə
@@ -431,7 +431,6 @@ export function AIChat({
             </Badge>
           </div>
 
-          {/* ✅ Context Preview Pills */}
           {preview && (
             <div className="flex flex-wrap gap-2">
               <span className="text-xs px-2 py-1 rounded-full border bg-background/60 flex items-center gap-1">
@@ -470,10 +469,10 @@ export function AIChat({
               </span>
             </div>
           )}
-        </CardDescription>
+        </CardDescription> */}
       </CardHeader>
 
-      <CardContent className="flex-1 min-h-0 p-0 overflow-hidden bg-background flex flex-col">
+      <CardContent className="flex-1 min-h-0  overflow-hidden bg-background flex flex-col md:pt-6 p-0 md:p-4 rounded-b-lg">
         {isChecking ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -496,10 +495,7 @@ export function AIChat({
             </Button>
           </div>
         ) : (
-          <ScrollArea
-            className="flex-1 min-h-0 p-5 [&_[data-radix-scroll-area-viewport]]:h-full"
-            ref={scrollRef}
-          >
+          <ScrollArea className="flex-1 min-h-0 p-2 " ref={scrollRef}>
             <div className="space-y-6">
               {messages.map((message) => (
                 <div
@@ -601,7 +597,7 @@ export function AIChat({
           )}
 
           <div className="p-4">
-            <form onSubmit={handleSubmit} className="flex items-end gap-2">
+            <form onSubmit={handleSubmit} className="flex items-start gap-2">
               <div className="flex-1">
                 <Textarea
                   ref={textareaRef}
@@ -614,7 +610,7 @@ export function AIChat({
                   disabled={isLoading || !!connectionError || isChecking}
                   className="min-h-[54px] max-h-[140px] resize-none text-[15px] leading-relaxed shadow-sm"
                 />
-                <p className="mt-2 text-[11px] text-muted-foreground">
+                <p className="mt-2 text-[9px] text-muted-foreground">
                   Enter: göndər • Shift+Enter: yeni sətir
                 </p>
               </div>
