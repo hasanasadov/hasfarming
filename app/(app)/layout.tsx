@@ -6,6 +6,7 @@ import "../globals.css";
 import { ThemeProvider } from "next-themes";
 import { AppShellPro } from "@/components/app-shell-pro";
 import { SensorListener } from "@/components/sensor-listener";
+import QueryProvider from "@/providers/query-provider";
 
 const _inter = Inter({ subsets: ["latin"] });
 
@@ -60,8 +61,10 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem={false}
         >
-          <SensorListener />
-          <AppShellPro>{children}</AppShellPro>
+          <QueryProvider>
+            <SensorListener />
+            <AppShellPro>{children}</AppShellPro>
+          </QueryProvider>
         </ThemeProvider>
         <Analytics />
       </body>

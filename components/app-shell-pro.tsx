@@ -28,7 +28,7 @@ import {
 
 const NAV = [
   { href: "/", label: "Nə etməli", icon: LayoutDashboard },
-  { href: "/weather", label: "Hava", icon: Cloud },
+  { href: "/weather", label: "Məkan və Hava", icon: Cloud },
   { href: "/crops", label: "Bitkilər", icon: Sprout },
   { href: "/chat", label: "AI Söhbət", icon: Bot },
   { href: "/settings", label: "Sensorum var", icon: Settings }, // ✅ NEW
@@ -124,7 +124,7 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
           <header className="sticky top-0 z-40 border-b bg-card/70 backdrop-blur supports-[backdrop-filter]:bg-card/40">
             <div className="h-14 px-4 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                {/* burda istəsən breadcrumb də edərik */}
+                Nə etməli tətbiqi - Ağıllı Ferma idarəetməsi - Aİ dəstəyi
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={reset}>
@@ -161,7 +161,24 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
             </Sheet>
 
             <Link href="/" className="font-semibold">
-              AgriSense
+              <Button
+                className="inline-flex items-center gap-2"
+                variant="ghost"
+              >
+                <Leaf className="h-5 w-5 text-primary" />
+                AgriSense
+              </Button>
+            </Link>
+
+            <Link href="/">
+              <Button variant="outline" size="sm">
+                Nə etməli ?
+              </Button>
+            </Link>
+            <Link href="/chat">
+              <Button variant="outline" size="sm">
+                AI Söhbət
+              </Button>
             </Link>
 
             <div className="flex items-center gap-2">

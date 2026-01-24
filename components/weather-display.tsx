@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -34,61 +35,72 @@ export function WeatherDisplay({
     null,
   );
   const [forecast, setForecast] = useState<WeatherData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  const fetchWeather = async () => {
-    setIsLoading(true);
-    setError(null);
+  // ✅ loop olmaması üçün callback ref
+  const onWeatherRef = useRef(onWeatherData);
+  useEffect(() => {
+    onWeatherRef.current = onWeatherData;
+  }, [onWeatherData]);
 
-    try {
+  const query = useQuery({
+    queryKey: ["weather", location.lat, location.lng],
+    enabled: Number.isFinite(location.lat) && Number.isFinite(location.lng),
+    queryFn: async () => {
       const response = await fetch(
         `/api/weather?lat=${location.lat}&lng=${location.lng}`,
-        {
-          cache: "no-store",
-        },
+        { cache: "no-store" },
       );
 
-      if (!response.ok) throw new Error("Hava məlumatları alına bilmədi");
+      if (!response.ok) {
+        throw new Error("Hava məlumatları alına bilmədi");
+      }
 
-      const data = await response.json();
+      return response.json();
+    },
+    refetchInterval: 10 * 60 * 1000, // 10 dəqiqə
+    refetchOnWindowFocus: true,
+    retry: 1,
+    staleTime: 0,
+  });
 
-      // Sənin API: data.current + data.forecast qaytarır
-      const todayForecast = data.forecast?.[0];
-
-      const current: WeatherData = {
-        date: new Date().toISOString().split("T")[0],
-        temp: data.current.temp,
-        tempMin: todayForecast?.tempMin ?? data.current.temp - 3,
-        tempMax: todayForecast?.tempMax ?? data.current.temp + 3,
-        humidity: data.current.humidity,
-        precipitation: data.current.precipitation,
-        windSpeed: data.current.windSpeed,
-        uvIndex: data.current.uvIndex,
-        description: data.current.description,
-        icon: data.current.icon,
-        soilMoisture: todayForecast?.soilMoisture ?? 50,
-      };
-
-      setCurrentWeather(current);
-      setForecast(Array.isArray(data.forecast) ? data.forecast : []);
-      setLastUpdate(new Date());
-      onWeatherData(current, Array.isArray(data.forecast) ? data.forecast : []);
-    } catch (err) {
-      console.error("Weather fetch error:", err);
-      setError("Hava məlumatları yüklənə bilmədi");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // ✅ data gələndə state-i doldur (UI eyni qalır)
   useEffect(() => {
-    fetchWeather();
-    const interval = setInterval(fetchWeather, 10 * 60 * 1000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.lat, location.lng]);
+    if (!query.data) return;
+
+    const data = query.data;
+    const todayForecast = data.forecast?.[0];
+
+    const current: WeatherData = {
+      date: new Date().toISOString().split("T")[0],
+      temp: data.current.temp,
+      tempMin: todayForecast?.tempMin ?? data.current.temp - 3,
+      tempMax: todayForecast?.tempMax ?? data.current.temp + 3,
+      humidity: data.current.humidity,
+      precipitation: data.current.precipitation,
+      windSpeed: data.current.windSpeed,
+      uvIndex: data.current.uvIndex,
+      description: data.current.description,
+      icon: data.current.icon,
+      soilMoisture: todayForecast?.soilMoisture ?? 50,
+    };
+
+    const nextForecast: WeatherData[] = Array.isArray(data.forecast)
+      ? data.forecast
+      : [];
+
+    setCurrentWeather(current);
+    setForecast(nextForecast);
+    setLastUpdate(new Date());
+
+    // ✅ parent store update (loop yoxdur)
+    onWeatherRef.current(current, nextForecast);
+  }, [query.data]);
+
+  const isLoading = query.isLoading;
+  const isRefreshing = query.isFetching;
+
+  const error = query.isError ? "Hava məlumatları yüklənə bilmədi" : null;
 
   const formatDayLabel = (dateStr: string, index: number) => {
     if (index === 0) return "Bu gün";
@@ -99,7 +111,6 @@ export function WeatherDisplay({
 
   const formatDateShort = (dateStr: string) => {
     const d = new Date(dateStr);
-    // AZ format qısa: 23.01
     const dd = String(d.getDate()).padStart(2, "0");
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     return `${dd}.${mm}`;
@@ -128,13 +139,13 @@ export function WeatherDisplay({
     );
   }
 
-  if (error) {
+  if (error && !currentWeather) {
     return (
       <Card className="border-destructive/50 shadow-lg">
         <CardContent className="py-6">
           <div className="text-center">
             <p className="text-destructive mb-4">{error}</p>
-            <Button onClick={fetchWeather} variant="outline">
+            <Button onClick={() => query.refetch()} variant="outline">
               <RefreshCw className="h-4 w-4 mr-2" />
               Yenidən cəhd et
             </Button>
@@ -166,12 +177,12 @@ export function WeatherDisplay({
           <Button
             variant="ghost"
             size="icon"
-            onClick={fetchWeather}
-            disabled={isLoading}
+            onClick={() => query.refetch()}
+            disabled={isRefreshing}
             title="Yenilə"
           >
             <RefreshCw
-              className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+              className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
             />
           </Button>
         </div>
@@ -243,6 +254,14 @@ export function WeatherDisplay({
                 </div>
               </div>
             </div>
+
+            {/* ✅ data gəlir amma arada error olarsa UI qalır, kiçik xəbərdarlıq */}
+            {query.isError && (
+              <div className="mt-4 text-xs text-destructive">
+                * Hazırda yeniləmə zamanı xəta oldu. Son uğurlu məlumat
+                göstərilir.
+              </div>
+            )}
           </div>
         )}
 
@@ -339,14 +358,21 @@ export function WeatherDisplay({
                     <Droplets className="h-4 w-4 text-primary" />
                     <span className="text-muted-foreground">
                       Torpaq nəmliyi:{" "}
-                      {val(Math.round(day.soilMoisture ?? 0), "N/A")}%{" "}
-                      <span className="text-xs opacity-70">(təxmini)</span>
+                      {val(Math.round(day.soilMoisture ?? 0), "N/A")}%
+                      <span className="text-xs opacity-70"> (təxmini)</span>
                     </span>
                   </div>
                 </div>
               </div>
             ))}
           </div>
+
+          {/* ✅ yeniləmə gedirsə yüngül info */}
+          {isRefreshing && (
+            <div className="text-xs text-muted-foreground mt-3">
+              Yenilənir...
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

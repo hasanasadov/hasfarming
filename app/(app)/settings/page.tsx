@@ -228,10 +228,10 @@ export default function SettingsPage() {
             <FirebaseSensorDisplay
               firebaseUrl={firebaseUrl}
               onSensorData={(d) => {
-                setSensorData(d); // ✅ store
-                setSensorStatus("connected"); // ✅ store
+                setSensorData(d);
+                setSensorStatus("connected");
               }}
-              onError={(msg) => setSensorStatus("error")}
+              onError={() => setSensorStatus("error")}
             />
           )}
         </CardContent>

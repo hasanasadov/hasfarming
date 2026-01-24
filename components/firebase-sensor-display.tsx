@@ -1,7 +1,6 @@
-// components/firebase-sensor-display.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Card,
   CardContent,
@@ -22,13 +21,22 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import type { FirebaseSensorData } from "@/lib/types";
-import { useAppStore } from "@/lib/store/app-store";
 
 interface FirebaseSensorDisplayProps {
   firebaseUrl: string; // base url: https://xxx.firebaseio.com
   onSensorData: (data: FirebaseSensorData) => void;
   onError?: (message: string) => void;
+}
+
+function normalizeFirebaseBaseUrl(raw: string) {
+  let url = (raw || "").trim();
+  if (!url) return "";
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  url = url.replace(/\.json(\?.*)?$/i, "");
+  url = url.replace(/\/+$/g, "");
+  return url;
 }
 
 function toNumberOrNull(x: any) {
@@ -58,14 +66,10 @@ function pickSensorObject(payload: any) {
     "temperature",
     "soilMoisture",
     "soilTemperature",
-    "airTemperature",
     "ph",
     "nit",
     "phos",
     "pot",
-    "nitrogen",
-    "phosphorus",
-    "potassium",
     "timestamp",
   ];
   if (keys.some((k) => likely.includes(k))) return payload;
@@ -103,6 +107,7 @@ function parseSensor(raw: any): FirebaseSensorData {
     toNumberOrNull(raw.temperature) ??
     20;
 
+  // səndə “temperature” bir dəyərdir, biz onu həm soil, həm air üçün fallback edirik
   const airTemperature =
     toNumberOrNull(raw.airTemperature) ??
     toNumberOrNull(raw.air_temperature) ??
@@ -163,125 +168,94 @@ export function FirebaseSensorDisplay({
   onSensorData,
   onError,
 }: FirebaseSensorDisplayProps) {
-  const cached = useAppStore((s) => s.sensorData);
-  const lastSensorAt = useAppStore((s) => s.lastSensorAt);
-  const [sensorData, setSensorData] = useState<FirebaseSensorData | null>(
-    cached,
+  const base = useMemo(
+    () => normalizeFirebaseBaseUrl(firebaseUrl),
+    [firebaseUrl],
   );
-  const [isLoading, setIsLoading] = useState(!cached);
-  const [isConnected, setIsConnected] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const isStale = lastSensorAt ? Date.now() - lastSensorAt > 60_000 : false; // 1 dəqiqə
 
   const [showRaw, setShowRaw] = useState(false);
   const [rawPreview, setRawPreview] = useState<any>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  const abortRef = useRef<AbortController | null>(null);
-  const timerRef = useRef<number | null>(null);
-  const backoffRef = useRef<number>(5000);
-
-  const base = useMemo(() => (firebaseUrl || "").trim(), [firebaseUrl]);
-
-  const scheduleNext = useCallback((ms: number) => {
-    if (timerRef.current) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(
-      () => void fetchSensorData("poll"),
-      ms,
-    );
-  }, []);
-
-  const fetchSensorData = useCallback(
-    async (mode: "initial" | "manual" | "poll" = "poll") => {
-      if (!base) return;
-
-      if (mode === "poll" && document.visibilityState !== "visible") {
-        scheduleNext(backoffRef.current);
-        return;
-      }
-
-      abortRef.current?.abort();
-      abortRef.current = new AbortController();
-
-      if (mode === "initial") setIsLoading(true);
-      if (mode === "manual") setIsRefreshing(true);
-
-      try {
-        const endpoint = `/api/firebase/read?url=${encodeURIComponent(
-          base,
-        )}&t=${Date.now()}`;
-
-        const res = await fetch(endpoint, {
-          method: "GET",
-          cache: "no-store",
-          signal: abortRef.current.signal,
-        });
-
-        const data = await res.json().catch(() => null);
-
-        if (!res.ok || !data) {
-          throw new Error("Server read failed");
-        }
-
-        if (!data.ok) {
-          if (showRaw) setRawPreview(data);
-          throw new Error(data.error || "Firebase read returned ok:false");
-        }
-
-        const json = data.payload;
-        const picked = pickSensorObject(json);
-
-        if (!picked) {
-          if (showRaw) setRawPreview(json);
-          throw new Error("No compatible sensor object found");
-        }
-
-        const reading = parseSensor(picked);
-
-        setSensorData(reading);
-        setLastUpdate(new Date());
-        setIsConnected(true);
-        setError(null);
-        onSensorData(reading);
-
-        if (showRaw) setRawPreview(json);
-
-        backoffRef.current = 5000;
-        scheduleNext(backoffRef.current);
-      } catch (err: any) {
-        if (err?.name === "AbortError") return;
-
-        const msg =
-          err?.message || "Firebase-dən məlumat alına bilmədi (format/icazə).";
-        setError(msg);
-        setIsConnected(false);
-        onError?.(msg);
-
-        backoffRef.current = Math.min(backoffRef.current * 2, 60000);
-        scheduleNext(backoffRef.current);
-      } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
-      }
-    },
-    [base, onSensorData, onError, scheduleNext, showRaw],
-  );
+  // ✅ loop fix: callback-ları ref-də saxla (deps-ə salmırıq)
+  const onSensorDataRef = useRef(onSensorData);
+  const onErrorRef = useRef(onError);
 
   useEffect(() => {
-    fetchSensorData("initial");
+    onSensorDataRef.current = onSensorData;
+  }, [onSensorData]);
 
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") fetchSensorData("poll");
-    };
-    document.addEventListener("visibilitychange", onVisibility);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      abortRef.current?.abort();
-      if (timerRef.current) window.clearTimeout(timerRef.current);
-    };
-  }, [fetchSensorData]);
+  // ✅ flapping olmasın: 3 ardıcıl failure-dan sonra disconnected
+  const failCountRef = useRef(0);
+  const [isConnected, setIsConnected] = useState(false);
+
+  const query = useQuery({
+    queryKey: ["firebase-sensor", base],
+    enabled: !!base,
+    queryFn: async () => {
+      const res = await fetch(`${base}/.json?t=${Date.now()}`, {
+        cache: "no-store",
+      });
+
+      if (!res.ok) throw new Error(`Firebase read failed: ${res.status}`);
+
+      const json = await res.json().catch(() => null);
+      if (!json) throw new Error("Firebase payload boşdur");
+
+      const picked = pickSensorObject(json);
+      if (!picked) throw new Error("No compatible sensor object found");
+
+      const reading = parseSensor(picked);
+      return { reading, raw: json };
+    },
+    refetchInterval: 5000, // istəsən 2000 et
+    refetchOnWindowFocus: true,
+    retry: 1,
+    staleTime: 0,
+  });
+
+  // ✅ yalnız “data yenilənəndə” işləsin deyə dataUpdatedAt-dan istifadə edirik
+  const lastHandledAtRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!query.data) return;
+
+    // eyni datanı təkrar handle etmə
+    if (query.dataUpdatedAt === lastHandledAtRef.current) return;
+    lastHandledAtRef.current = query.dataUpdatedAt;
+
+    // success
+    failCountRef.current = 0;
+
+    setIsConnected((prev) => (prev ? prev : true)); // yalnız false->true olanda dəyişsin
+    setLastUpdate(new Date());
+
+    if (showRaw) setRawPreview(query.data.raw);
+
+    // ref ilə çağırırıq (loop yoxdur)
+    onSensorDataRef.current(query.data.reading);
+  }, [query.data, query.dataUpdatedAt, showRaw]);
+
+  useEffect(() => {
+    if (!query.isError) return;
+
+    failCountRef.current += 1;
+
+    if (failCountRef.current >= 3) {
+      setIsConnected((prev) => (prev ? false : prev)); // yalnız true->false
+    }
+
+    const msg =
+      query.error instanceof Error ? query.error.message : "Firebase xətası";
+
+    onErrorRef.current?.(msg);
+  }, [query.isError, query.error]);
+
+  const sensorData = query.data?.reading;
 
   const getStatusColor = (
     value: number,
@@ -294,7 +268,7 @@ export function FirebaseSensorDisplay({
     return "bg-accent/20 text-accent-foreground border-accent/30";
   };
 
-  if (isLoading && !sensorData) {
+  if (query.isLoading && !sensorData) {
     return (
       <Card className="border-border/50 shadow-lg">
         <CardHeader>
@@ -335,9 +309,9 @@ export function FirebaseSensorDisplay({
                 )}
                 {isConnected ? "Bağlı" : "Bağlantı kəsildi"}
               </Badge>
-              <span className="text-xs text-muted-foreground truncate max-w-[520px]">
+              {/* <span className="text-xs text-muted-foreground truncate max-w-[520px]">
                 {base}
-              </span>
+              </span> */}
             </CardDescription>
           </div>
 
@@ -354,12 +328,12 @@ export function FirebaseSensorDisplay({
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => fetchSensorData("manual")}
-              disabled={isRefreshing}
+              onClick={() => query.refetch()}
+              disabled={query.isFetching}
               title="Yenilə"
             >
               <RefreshCw
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+                className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`}
               />
             </Button>
 
@@ -377,11 +351,16 @@ export function FirebaseSensorDisplay({
       </CardHeader>
 
       <CardContent>
-        {error && (
+        {query.isError && (
           <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="text-sm text-destructive">
+              {query.error instanceof Error
+                ? query.error.message
+                : "Xəta baş verdi"}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
-              * Xəta olduqda yenilənmə intervalı avtomatik artırılır (backoff).
+              * UI “disconnect” olmur — 3 ardıcıl xətadan sonra kəsilmiş
+              sayılır.
             </p>
           </div>
         )}

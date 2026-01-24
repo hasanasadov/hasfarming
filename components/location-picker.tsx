@@ -22,6 +22,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import type { Location } from "@/lib/types";
+import { MapPicker } from "./map-picker";
 
 interface LocationPickerProps {
   onLocationSelect: (location: Location) => void;
@@ -97,6 +98,7 @@ export function LocationPicker({
 
   // ✅ yeni: axtarış / manual bölməsi açılıb-bağlansın
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   // ✅ son “uğurlu” nəticələri saxla (fuzzy fallback üçün)
   const lastSuccessfulResults = useRef<SearchResult[]>([]);
@@ -340,8 +342,6 @@ export function LocationPicker({
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           )}
         </button>
-
-        {/* Advanced Content */}
         {isAdvancedOpen && (
           <div className="space-y-6">
             {/* Search */}
@@ -460,6 +460,32 @@ export function LocationPicker({
           </div>
         )}
 
+        {/* Advanced Content */}
+        <button
+          type="button"
+          onClick={() => setIsMapOpen((s) => !s)}
+          className="w-full rounded-xl border border-border/60 bg-card hover:bg-muted/30 transition-colors px-4 py-3 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4 text-primary" />
+            <div className="text-left">
+              <p className="text-sm font-medium text-foreground">
+                Xəritə ilə seçim
+              </p>
+            </div>
+          </div>
+          {isMapOpen ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
+        {isMapOpen && (
+          <MapPicker
+            onLocationSelect={onLocationSelect}
+            selectedLocation={selectedLocation}
+          />
+        )}
         {/* Error */}
         {error && (
           <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3">
