@@ -49,7 +49,6 @@ type AppState = {
 };
 
 export const useAppStore = create<AppState>((set) => ({
-  // --- initial state ---
   location: null,
   selectedCrop: null,
   dayIndex: 0,

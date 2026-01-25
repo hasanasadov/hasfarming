@@ -18,19 +18,19 @@ export default function ChatPage() {
 
   return (
     <RouteGuard need={["location", "weather", "crop"]}>
-      <div className="space-y-6">
-        <ContextPreview />
+      {/* <div className="space-y-6"> */}
+      <ContextPreview />
 
-        <AIChat
-          location={location}
-          crop={selectedCrop}
-          weather={currentWeather}
-          sensorData={sensorData}
-          forecast={forecast}
-          dayIndex={dayIndex}
-          dataSource={dataSource}
-        />
-      </div>
+      <AIChat
+        location={location}
+        crop={selectedCrop}
+        weather={currentWeather}
+        sensorData={sensorData}
+        forecast={forecast}
+        dayIndex={dayIndex}
+        dataSource={dataSource}
+      />
+      {/* </div> */}
     </RouteGuard>
   );
 }

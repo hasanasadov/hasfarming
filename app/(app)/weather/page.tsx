@@ -1,6 +1,7 @@
 "use client";
 
 import { LocationPicker } from "@/components/location-picker";
+import { NextStep } from "@/components/next-step";
 import { WeatherDisplay } from "@/components/weather-display";
 import { useAppStore } from "@/lib/store/app-store";
 
@@ -22,6 +23,7 @@ export default function WeatherPage() {
           />
         </div>
       )}
+      <NextStep />
     </div>
   );
 }

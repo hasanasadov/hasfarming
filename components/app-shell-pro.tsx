@@ -24,6 +24,7 @@ import {
   Menu,
   MapPin,
   Leaf,
+  PiIcon,
 } from "lucide-react";
 
 const NAV = [
@@ -154,8 +155,19 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
                   <SheetTitle>Navigation Menu</SheetTitle>
                 </VisuallyHidden>
 
-                <div className="p-3">
+                <div className="p-3 flex flex-col h-full justify-between">
                   <NavLinks onNavigate={() => setOpen(false)} />
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      confirm(
+                        "Tətbiqi yenidən başlatmaq istədiyinizə əminsiniz?",
+                      ) && reset();
+                      setOpen(false);
+                    }}
+                  >
+                    Yenidən başlat
+                  </Button>
                 </div>
               </SheetContent>
             </Sheet>
@@ -170,11 +182,11 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
               </Button>
             </Link>
 
-            <Link href="/">
+            {/* <Link href="/">
               <Button variant="outline" size="sm">
                 Nə etməli ?
               </Button>
-            </Link>
+            </Link> */}
             <Link href="/chat">
               <Button variant="outline" size="sm">
                 AI Söhbət
@@ -187,7 +199,7 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="p-4">{children}</main>
+        <main className="">{children}</main>
       </div>
     </div>
   );

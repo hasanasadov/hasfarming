@@ -7,35 +7,20 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Bot,
   Send,
-  User,
   Loader2,
   RefreshCw,
-  Eraser,
   WifiOff,
-  Thermometer,
-  Droplets,
-  Wind,
-  Sun,
-  Sprout,
-  MapPin,
-  Cloud,
-  Database,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
-import {
+import type {
   Location,
   Crop,
   WeatherData,
@@ -44,6 +29,7 @@ import {
 } from "@/lib/types";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { cn } from "@/lib/utils";
 
 interface Message {
   id: string;
@@ -72,6 +58,21 @@ function TypingDots() {
   );
 }
 
+// small autosize (no libs)
+function useAutosizeTextarea(
+  ref: React.RefObject<HTMLTextAreaElement | null>,
+  value: string,
+  maxHeight = 180,
+) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "0px";
+    const next = Math.min(el.scrollHeight, maxHeight);
+    el.style.height = `${next}px`;
+  }, [ref, value, maxHeight]);
+}
+
 export function AIChat({
   location,
   crop,
@@ -81,7 +82,7 @@ export function AIChat({
   dayIndex,
   dataSource,
 }: AIChatProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollWrapRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [input, setInput] = useState("");
@@ -91,75 +92,25 @@ export function AIChat({
   const [isChecking, setIsChecking] = useState(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
+  // mobile-də quick prompts default gizli
+  const [showPrompts, setShowPrompts] = useState(false);
+
+  useAutosizeTextarea(textareaRef, input, 180);
+
   const quickPrompts = useMemo(
     () => [
       "Bu gün suvarım, yoxsa gözləyim?",
       "Sabah yağışa görə nə etməliyəm?",
-      "Torpaq nəmliyi aşağıdırsa nə qədər su vermək olar?",
+      "Torpaq nəmliyi aşağıdırsa nə qədər su verim?",
       "Bu həftə gübrə üçün plan ver",
-      "Bitkim üçün risk varmı? (temperatur/yağış)",
+      "Risk varmı? (temperatur/yağış/külək)",
     ],
     [],
   );
 
-  const tips = useMemo(
-    () => [
-      "Yağış gözlənirsə suvarmanı azaltmaq daha məntiqlidir.",
-      "Torpaq nəmliyi 30%-dən aşağıdırsa stres başlayır.",
-      "Külək yüksəkdirsə buxarlanma artır — suvarma vaxtını səhər/axşam seç.",
-      "pH ölçüsün varsa, gübrə planı daha dəqiq olur.",
-    ],
-    [],
-  );
-  const [tip, setTip] = useState(tips[0]);
+  const cropNameAz = crop?.nameAz || "Bitki";
 
-  useEffect(() => {
-    if (!isLoading) return;
-    setTip(tips[Math.floor(Math.random() * tips.length)]);
-  }, [isLoading, tips]);
-
-  const cropNameAz = crop?.nameAz || "Kənd təsərrüfatı";
-  const selectedDay = forecast?.[dayIndex] ?? null;
-
-  // Context preview values (seçilmiş gün)
-  const preview = useMemo(() => {
-    const d = selectedDay || weather;
-    if (!d) return null;
-
-    const isToday = dayIndex === 0;
-    const soilFromSensor =
-      isToday && dataSource === "firebase"
-        ? sensorData?.soilMoisture
-        : undefined;
-
-    return {
-      label: isToday ? "Bu gün" : `Gün ${dayIndex + 1}`,
-      temp: d.temp,
-      tempMin: d.tempMin,
-      tempMax: d.tempMax,
-      precipitation: d.precipitation,
-      windSpeed: d.windSpeed,
-      uvIndex: d.uvIndex,
-      humidity: d.humidity,
-      soilMoisture: soilFromSensor ?? d.soilMoisture,
-      description: d.description,
-      source:
-        dataSource === "firebase"
-          ? "Sensor"
-          : dataSource === "weather"
-            ? "Hava API"
-            : "Seçilməyib",
-      sourceIcon:
-        dataSource === "firebase" ? (
-          <Database className="h-3.5 w-3.5" />
-        ) : (
-          <Cloud className="h-3.5 w-3.5" />
-        ),
-      hasSensorPriority: isToday && dataSource === "firebase",
-    };
-  }, [selectedDay, weather, dayIndex, dataSource, sensorData?.soilMoisture]);
-
-  // ✅ Health check
+  // ✅ Health check + welcome
   useEffect(() => {
     const checkConnection = async () => {
       try {
@@ -169,15 +120,13 @@ export function AIChat({
           body: JSON.stringify({ check: true }),
         });
 
-        if (!res.ok) {
-          console.warn("Health check failed:", res.status);
-        }
+        if (!res.ok) console.warn("Health check failed:", res.status);
 
         setMessages([
           {
             id: "welcome",
             role: "assistant",
-            content: `Salam! Mən **AgriSense AI** köməkçisiyəm. 🌾\n\n**${cropNameAz}** ilə bağlı nə sualınız var?`,
+            content: `Salam! Mən **AgriSense AI** köməkçisiyəm. 🌾\n\n📌 Məkan + hava + **${cropNameAz}** konteksti ilə sizə dəqiq tövsiyə verəcəyəm.\n\nİstəsəniz: “Bu gün suvarım?”`,
           },
         ]);
         setConnectionError(null);
@@ -192,23 +141,23 @@ export function AIChat({
     };
 
     checkConnection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cropNameAz]);
 
-  // ✅ Auto scroll
+  // ✅ Auto-scroll
   useEffect(() => {
-    if (!scrollRef.current) return;
-    const viewport = scrollRef.current.querySelector(
+    if (!scrollWrapRef.current) return;
+    const viewport = scrollWrapRef.current.querySelector(
       "[data-radix-scroll-area-viewport]",
     ) as HTMLDivElement | null;
     if (!viewport) return;
 
-    viewport.scrollTo({
-      top: viewport.scrollHeight,
-      behavior: "smooth",
-    });
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
   }, [messages, isLoading]);
 
   const buildContext = useCallback(() => {
+    const selectedDay = forecast?.[dayIndex] ?? null;
+
     return {
       meta: {
         app: "AgriSense",
@@ -288,16 +237,7 @@ export function AIChat({
         description: d.description,
       })),
     };
-  }, [
-    crop,
-    dataSource,
-    dayIndex,
-    forecast,
-    location,
-    selectedDay,
-    sensorData,
-    weather,
-  ]);
+  }, [crop, dataSource, dayIndex, forecast, location, sensorData, weather]);
 
   const sendMessage = useCallback(
     async (userText: string) => {
@@ -305,7 +245,7 @@ export function AIChat({
         return;
 
       const userMessage: Message = {
-        id: Date.now().toString(),
+        id: crypto?.randomUUID?.() ?? Date.now().toString(),
         role: "user",
         content: userText.trim(),
       };
@@ -313,6 +253,9 @@ export function AIChat({
       const newMessages = [...messages, userMessage];
       setMessages(newMessages);
       setIsLoading(true);
+
+      // mobile: prompt-ları göndərəndə gizlət
+      setShowPrompts(false);
 
       try {
         const response = await fetch("/api/chat", {
@@ -334,7 +277,7 @@ export function AIChat({
             {
               id: (Date.now() + 1).toString(),
               role: "assistant",
-              content: `⚠️ Limit doldu. ${data.retryDelay || "10s"} sonra yenidən yoxlayın. ✅ Tamamlandı`,
+              content: `⚠️ Limit doldu. ${data.retryDelay || "10s"} sonra yenidən yoxlayın.`,
             },
           ]);
           return;
@@ -372,164 +315,172 @@ export function AIChat({
     [buildContext, connectionError, isChecking, isLoading, messages],
   );
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault();
+  const handleSubmit = async () => {
     const text = input;
+    if (!text.trim()) return;
     setInput("");
     await sendMessage(text);
   };
 
-  // ✅ Enter send, Shift+Enter newline
   const onKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== "Enter") return;
-    if (e.shiftKey) return; // newline
+    if (e.shiftKey) return;
     e.preventDefault();
-    if (!input.trim()) return;
-    const text = input;
-    setInput("");
-    await sendMessage(text);
+    await handleSubmit();
   };
 
+  const canSend =
+    !isLoading && !isChecking && !connectionError && input.trim().length > 0;
+
+  // ---- UI ----
+  // IMPORTANT:
+  // Page layoutın üstündə ContextPreview var → AIChat full height olmalıdı,
+  // amma ContextPreview hündürlüyünü bilmirik. Ona görə "min-h" və "flex-1" istifadə edirik.
+  // ChatPage-də parent (page) flex-col olarsa super olacaq.
   return (
-    <Card className="border-border/50 shadow-lg h-[740px] lg:h-[820px] flex flex-col !py-0 !gap-0">
-      <CardHeader className="pb-1 border-b !py-4 !gap-0 flex items-center h-fit">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <Bot
-            className={`h-6 w-6 ${connectionError ? "text-red-500" : "text-primary"}`}
-          />
-          <div>AgriSense AI</div>
-        </CardTitle>
-
-        {/* <CardDescription className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-muted-foreground">
-              Süni intellekt ilə canlı məsləhətləşmə
-            </span>
-
-            {location?.address && (
-              <span className="text-xs px-2 py-1 rounded-full bg-muted border flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5" />
-                {location.address.split(",")[0]}
-              </span>
-            )}
-
-            {crop && (
-              <span className="text-xs px-2 py-1 rounded-full bg-muted border flex items-center gap-1">
-                <Sprout className="h-3.5 w-3.5" />
-                {crop.nameAz}
-              </span>
-            )}
-
-            <span className="text-xs px-2 py-1 rounded-full bg-muted border flex items-center gap-1">
-              {preview?.sourceIcon}
-              {preview?.source ?? "Mənbə seçilməyib"}
-            </span>
-
-            <Badge variant="secondary" className="gap-1">
-              🗓 {preview?.label ?? "Seçilməyib"}
-              {preview?.hasSensorPriority ? " • sensor prioritet" : ""}
+    <div className="w-full flex flex-col min-h-[72svh] md:min-h-[78vh]">
+      {/* Top bar (ChatGPT vibe, minimal) */}
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b">
+        <div className="mx-auto  px-3 md:px-6 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Bot
+              className={cn(
+                "h-5 w-5",
+                connectionError ? "text-red-500" : "text-primary",
+              )}
+            />
+            <div className="font-semibold truncate">AgriSense AI</div>
+            <Badge variant="secondary" className="hidden sm:inline-flex">
+              {cropNameAz}
             </Badge>
           </div>
 
-          {preview && (
-            <div className="flex flex-wrap gap-2">
-              <span className="text-xs px-2 py-1 rounded-full border bg-background/60 flex items-center gap-1">
-                <Thermometer className="h-3.5 w-3.5 text-orange-500" />
-                {Math.round(preview.temp)}°C
-                <span className="opacity-70">
-                  ({Math.round(preview.tempMin)}°/{Math.round(preview.tempMax)}
-                  °)
-                </span>
-              </span>
+          {connectionError ? (
+            <Badge variant="destructive" className="gap-1">
+              <WifiOff className="h-3.5 w-3.5" />
+              Offline
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="hidden sm:inline-flex">
+              {dataSource === "firebase" ? "Sensor + Weather" : "Weather"}
+            </Badge>
+          )}
+        </div>
 
-              <span className="text-xs px-2 py-1 rounded-full border bg-background/60 flex items-center gap-1">
-                <Droplets className="h-3.5 w-3.5 text-primary" />
-                Yağış: {Math.round(preview.precipitation)} mm
-              </span>
+        {/* Prompts row: Desktop always visible, Mobile collapsible */}
+        {!connectionError && !isChecking && (
+          <div className="mx-auto  px-3 md:px-6 pb-3">
+            {/* mobile toggle */}
+            <div className="flex md:hidden items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowPrompts((v) => !v)}
+                className="text-xs text-muted-foreground inline-flex items-center gap-1"
+              >
+                Hazır suallar
+                {showPrompts ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </button>
 
-              {typeof preview.soilMoisture === "number" && (
-                <span className="text-xs px-2 py-1 rounded-full border bg-background/60 flex items-center gap-1">
-                  <Droplets className="h-3.5 w-3.5 text-emerald-500" />
-                  Torpaq: {Math.round(preview.soilMoisture)}%
-                </span>
-              )}
-
-              <span className="text-xs px-2 py-1 rounded-full border bg-background/60 flex items-center gap-1">
-                <Wind className="h-3.5 w-3.5 text-blue-400" />
-                Külək: {Math.round(preview.windSpeed)} km/s
-              </span>
-
-              <span className="text-xs px-2 py-1 rounded-full border bg-background/60 flex items-center gap-1">
-                <Sun className="h-3.5 w-3.5 text-yellow-500" />
-                UV: {preview.uvIndex?.toFixed(1) ?? "N/A"}
-              </span>
-
-              <span className="text-xs px-2 py-1 rounded-full border bg-background/60">
-                {preview.description}
+              <span className="text-[11px] text-muted-foreground hidden md:flex">
+                Enter: göndər • Shift+Enter: yeni sətir
               </span>
             </div>
-          )}
-        </CardDescription> */}
-      </CardHeader>
 
-      <CardContent className="flex-1 min-h-0  overflow-hidden bg-background flex flex-col md:pt-6 p-0 md:p-4 rounded-b-lg">
+            {/* desktop: chips visible */}
+            <div className="hidden md:flex flex-wrap gap-2">
+              {quickPrompts.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => {
+                    setInput(p);
+                    setTimeout(() => textareaRef.current?.focus(), 30);
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-full border border-border bg-muted/40 hover:bg-muted transition"
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            {/* mobile: collapsible chips */}
+            {showPrompts && (
+              <div className="md:hidden mt-2 flex flex-wrap gap-2">
+                {quickPrompts.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => {
+                      setInput(p);
+                      setShowPrompts(false);
+                      setTimeout(() => textareaRef.current?.focus(), 30);
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-full border border-border bg-muted/40 hover:bg-muted transition"
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 min-h-0">
         {isChecking ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+          <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground py-14">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <p className="text-base">AI Sistemi yoxlanılır...</p>
+            <p className="text-base">AI sistemi yoxlanılır…</p>
           </div>
         ) : connectionError ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
+          <div className="h-full flex flex-col items-center justify-center gap-4 p-6 text-center py-14">
             <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
               <WifiOff className="h-8 w-8 text-red-500" />
             </div>
             <div className="space-y-2">
               <h3 className="font-bold text-lg">Əlaqə Qurulmadı</h3>
-              <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">
+              <p className="text-sm text-muted-foreground max-w-[360px] mx-auto">
                 {connectionError}
               </p>
             </div>
             <Button variant="outline" onClick={() => window.location.reload()}>
               <RefreshCw className="mr-2 h-4 w-4" />
-              Səhifəni Yenilə
+              Yenilə
             </Button>
           </div>
         ) : (
-          <ScrollArea className="flex-1 min-h-0 p-2 " ref={scrollRef}>
-            <div className="space-y-6">
-              {messages.map((message) => (
+          <ScrollArea className="h-full" ref={scrollWrapRef}>
+            <div className="mx-auto  px-3 md:px-6 py-6 space-y-6">
+              {messages.map((m) => (
                 <div
-                  key={message.id}
-                  className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}
+                  key={m.id}
+                  className={cn(
+                    "flex",
+                    m.role === "user" ? "justify-end" : "justify-start",
+                  )}
                 >
                   <div
-                    className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center border shadow-sm ${
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 border-green-200 dark:border-green-800"
-                    }`}
-                  >
-                    {message.role === "user" ? (
-                      <User className="h-4 w-4" />
-                    ) : (
-                      <Bot className="h-4 w-4" />
+                    className={cn(
+                      "max-w-[92%] md:max-w-[78%] rounded-2xl px-3 py-2 md:px-4 md:py-3 text-[15px] leading-relaxed",
+                      m.role === "user"
+                        ? "bg-primary text-primary-foreground rounded-br-sm"
+                        : "bg-muted/50 border border-border/50 text-foreground rounded-bl-sm",
                     )}
-                  </div>
-
-                  <div
-                    className={`flex-1 max-w-[92%] rounded-2xl p-5 shadow-sm text-[15px] leading-relaxed ${
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground rounded-tr-none"
-                        : "bg-muted/50 border border-border/50 rounded-tl-none text-foreground"
-                    }`}
                   >
-                    {message.role === "user" ? (
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                    {m.role === "user" ? (
+                      <p className="whitespace-pre-wrap">{m.content}</p>
                     ) : (
                       <div
-                        className="prose prose-base dark:prose-invert max-w-none break-words
-                        prose-p:leading-relaxed prose-pre:bg-zinc-900 prose-pre:p-3 prose-pre:rounded-lg
-                        prose-strong:font-bold prose-headings:font-bold prose-headings:my-2"
+                        className={cn(
+                          "prose prose-sm md:prose-base dark:prose-invert max-w-none break-words",
+                          "prose-p:leading-relaxed prose-pre:bg-zinc-900 prose-pre:p-3 prose-pre:rounded-lg",
+                          "prose-strong:font-bold prose-headings:font-bold prose-headings:my-2",
+                        )}
                       >
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
@@ -543,7 +494,7 @@ export function AIChat({
                             ),
                           }}
                         >
-                          {message.content}
+                          {m.content}
                         </ReactMarkdown>
                       </div>
                     )}
@@ -551,96 +502,73 @@ export function AIChat({
                 </div>
               ))}
 
+              {/* typing indicator only when loading */}
               {isLoading && (
-                <div className="flex gap-3">
-                  <div className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center border shadow-sm">
-                    <Bot className="h-4 w-4 text-green-700 dark:text-green-300" />
-                  </div>
-
-                  <div className="flex-1 max-w-[92%] bg-muted/50 border border-border/50 rounded-2xl rounded-tl-none p-5 shadow-sm">
+                <div className="flex justify-start">
+                  <div className="max-w-[92%] md:max-w-[78%] bg-muted/50 border border-border/50 rounded-2xl rounded-bl-sm px-3 py-2 md:px-4 md:py-3">
                     <div className="flex items-center gap-2">
                       <TypingDots />
                       <span className="text-sm text-muted-foreground">
                         AI yazır…
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground/80 mt-2">
-                      {tip}
-                    </p>
                   </div>
                 </div>
               )}
+
+              {/* spacer so last msg not hidden under composer */}
+              <div className="h-28 md:h-32" />
             </div>
           </ScrollArea>
         )}
+      </div>
 
-        {/* Bottom Composer */}
-        <div className="border-t bg-background/95 backdrop-blur">
-          {!connectionError && !isChecking && (
-            <div className="p-3 border-b border-border/60">
-              <div className="flex flex-wrap gap-2">
-                {quickPrompts.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => {
-                      setInput(p);
-                      setTimeout(() => textareaRef.current?.focus(), 30);
-                    }}
-                    className="text-xs px-3 py-1.5 rounded-full border border-border bg-muted/40 hover:bg-muted transition"
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="p-4">
-            <form onSubmit={handleSubmit} className="flex items-start gap-2">
-              <div className="flex-1">
-                <Textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={onKeyDown}
-                  placeholder={
-                    connectionError ? "Sistem işləmir..." : "Sualınızı yazın… "
-                  }
-                  disabled={isLoading || !!connectionError || isChecking}
-                  className="min-h-[54px] max-h-[140px] resize-none text-[15px] leading-relaxed shadow-sm"
-                />
-                <p className="mt-2 text-[9px] text-muted-foreground">
-                  Enter: göndər • Shift+Enter: yeni sətir
-                </p>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={
-                  isLoading || !input.trim() || !!connectionError || isChecking
-                }
-                className="h-[54px] w-[54px]"
-                size="icon"
-              >
-                <Send className="h-5 w-5" />
-              </Button>
-
-              {messages.length > 2 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-[54px] w-[54px]"
-                  size="icon"
-                  onClick={() => setMessages(messages.slice(0, 1))}
-                >
-                  <Eraser className="h-5 w-5 text-muted-foreground" />
-                </Button>
+      {/* Composer (sticky bottom) */}
+      <div className="sticky bottom-0 z-10 bg-background/90 backdrop-blur border-t">
+        <div className="mx-auto  px-3 md:px-6 py-3">
+          <div className="rounded-2xl border border-border bg-background shadow-sm px-2 py-2 flex items-end gap-2">
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="Mesaj yaz…"
+              disabled={isLoading || !!connectionError || isChecking}
+              className={cn(
+                "min-h-[44px] max-h-[180px] resize-none border-0 shadow-none focus-visible:ring-0",
+                "text-[15px] leading-relaxed",
+                "px-2 py-2",
               )}
-            </form>
+            />
+
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canSend}
+              className="h-10 w-10 rounded-xl"
+              size="icon"
+              title="Göndər"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+
+          {/* helper row: desktop only (mobile-də yuxarıda göstəririk) */}
+          <div className="mt-1.5 hidden md:flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>Enter: göndər • Shift+Enter: yeni sətir</span>
+            <span>
+              Mənbə:{" "}
+              <span className="font-medium">
+                {dataSource === "firebase" ? "Sensor + Weather" : "Weather"}
+              </span>
+            </span>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
