@@ -11,7 +11,7 @@ import QueryProvider from "@/providers/query-provider";
 const _inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "AgriSense - Smart Farming Platform",
+  title: "Bərəkət - Smart Farming Platform",
   description:
     "Smart farming platform with live weather data, soil analysis, and personalized crop recommendations",
   generator: "asadov.site",

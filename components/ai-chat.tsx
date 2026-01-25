@@ -126,7 +126,7 @@ export function AIChat({
           {
             id: "welcome",
             role: "assistant",
-            content: `Salam! Mən **AgriSense AI** köməkçisiyəm. 🌾\n\n📌 Məkan + hava + **${cropNameAz}** konteksti ilə sizə dəqiq tövsiyə verəcəyəm.\n\nİstəsəniz: “Bu gün suvarım?”`,
+            content: `Salam! Mən **Bərəkət AI** köməkçisiyəm. 🌾\n\n📌 Məkan + hava + **${cropNameAz}** konteksti ilə sizə dəqiq tövsiyə verəcəyəm.\n\nİstəsəniz: “Bu gün suvarım?”`,
           },
         ]);
         setConnectionError(null);
@@ -160,7 +160,7 @@ export function AIChat({
 
     return {
       meta: {
-        app: "AgriSense",
+        app: "Bərəkət",
         locale: "az-AZ",
         nowISO: new Date().toISOString(),
         selectedDayIndex: dayIndex,
@@ -349,7 +349,7 @@ export function AIChat({
                 connectionError ? "text-red-500" : "text-primary",
               )}
             />
-            <div className="font-semibold truncate">AgriSense AI</div>
+            <div className="font-semibold truncate">Bərəkət AI</div>
             <Badge variant="secondary" className="hidden sm:inline-flex">
               {cropNameAz}
             </Badge>

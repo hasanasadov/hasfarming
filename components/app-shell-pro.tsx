@@ -58,7 +58,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           <Leaf className="h-6 w-6 text-primary" />
         </span>
         <div className="min-w-0">
-          <div className="font-semibold leading-tight">AgriSense</div>
+          <div className="font-semibold leading-tight">Bərəkət</div>
           <div className="text-xs text-muted-foreground -mt-0.5">
             Ağıllı Ferma
           </div>
@@ -178,7 +178,7 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
                 variant="ghost"
               >
                 <Leaf className="h-5 w-5 text-primary" />
-                AgriSense
+                Bərəkət
               </Button>
             </Link>
 

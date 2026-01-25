@@ -10,7 +10,7 @@ function buildSystemPrompt(context: any) {
   const ctx = context ? JSON.stringify(context, null, 2) : "{}";
 
   return `
-Sən AgriSense platformasının peşəkar aqronom köməkçisisən.
+Sən Bərəkət platformasının peşəkar aqronom köməkçisisən.
 Dil: Azərbaycan dili.
 
 Sənə "context" verilir. Sən MÜTLƏQ bu context-ə əsaslanmalısan.

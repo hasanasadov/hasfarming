@@ -26,7 +26,7 @@ const Footer = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg text-foreground">
-                    AgriSense
+                    Bərəkət
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     Smart Farming Platform
@@ -101,7 +101,7 @@ const Footer = () => {
           {/* Bottom Bar */}
           <div className="mt-8 pt-6 border-t border-border/50 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              2024 AgriSense. Bütün hüquqlar qorunur.
+              2026 Bərəkət. Bütün hüquqlar qorunur.
             </p>
             <div className="flex items-center gap-4">
               <span className="text-xs text-muted-foreground flex items-center gap-1.5">
