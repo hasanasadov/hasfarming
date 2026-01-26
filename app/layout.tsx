@@ -2,7 +2,7 @@ import React from "react";
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import "../globals.css";
+import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import { AppShellPro } from "@/components/app-shell-pro";
 import { SensorListener } from "@/components/sensor-listener";
@@ -61,10 +61,7 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem={false}
         >
-          <QueryProvider>
-            <SensorListener />
-            <AppShellPro>{children}</AppShellPro>
-          </QueryProvider>
+          <QueryProvider>{children}</QueryProvider>
         </ThemeProvider>
         <Analytics />
       </body>

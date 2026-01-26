@@ -123,3 +123,32 @@
     @apply bg-background text-foreground;
   }
 }
+
+
+
+.dark body {
+  background: rgb(6 8 15);      /* deep dark */
+  color: rgb(248 250 252);      /* slate-50 */
+}
+
+/* Subtle grid utility (optional) */
+.bg-grid {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(2, 6, 23, 0.06) 1px, transparent 0),
+    radial-gradient(circle at 1px 1px, rgba(16, 185, 129, 0.18) 1px, transparent 0);
+  background-size: 28px 28px, 84px 84px;
+}
+
+.dark .bg-grid {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.06) 1px, transparent 0),
+    radial-gradient(circle at 1px 1px, rgba(16, 185, 129, 0.16) 1px, transparent 0);
+}
+
+.vignette {
+  mask-image: radial-gradient(60% 55% at 50% 35%, black 55%, transparent 100%);
+}
+
+::selection {
+  background: rgba(13, 153, 1, 0.251);
+}

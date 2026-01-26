@@ -27,7 +27,7 @@ export function RouteGuard({
 
   return (
     <Card className="p-6 space-y-3">
-      <h2 className="text-lg font-bold">Davam etmək üçün məlumat çatmır</h2>
+      <h2 className="text-lg font-bold">Davam etmək üçün addımları tamamlayın</h2>
       <p className="text-sm text-muted-foreground">
         AI və panel düzgün işləsin deyə aşağıdakı addımları tamamlayın:
       </p>

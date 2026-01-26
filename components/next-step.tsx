@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/lib/store/app-store";
 import RenderIf from "@/lib/renderIf";
@@ -14,12 +13,9 @@ export function NextStep() {
 
   const pathName =
     typeof window !== "undefined" ? window.location.pathname : "";
-  const isHomePage =
-    pathName.startsWith("/") &&
-    !pathName.startsWith("/crops") &&
-    !pathName.startsWith("/weather");
+  const isDashboardPage = pathName.startsWith("/dashboard");
 
-  const offerAI = hasLocation && hasCrop && hasForecast && isHomePage;
+  const offerAI = hasLocation && hasCrop && hasForecast && isDashboardPage;
   // Determine step and target
   let step = 1;
   let href = "/crops";

@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 
 const NAV = [
-  { href: "/", label: "Nə etməli", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Nə etməli", icon: LayoutDashboard },
   { href: "/weather", label: "Məkan və Hava", icon: Cloud },
   { href: "/crops", label: "Bitkilər", icon: Sprout },
   { href: "/chat", label: "AI Söhbət", icon: Bot },
