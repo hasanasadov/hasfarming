@@ -7,10 +7,13 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
+import { useRouter } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+
 import {
   Bot,
   Send,
@@ -19,7 +22,11 @@ import {
   WifiOff,
   ChevronDown,
   ChevronUp,
+  MessageSquareText,
+  X,
+  Trash2,
 } from "lucide-react";
+
 import type {
   Location,
   Crop,
@@ -27,15 +34,10 @@ import type {
   FirebaseSensorData,
   DataSource,
 } from "@/lib/types";
+import { useAppStore, buildThreadMeta } from "@/lib/store/app-store"; // <-- yolunu yoxla
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-}
 
 interface AIChatProps {
   location: Location | null;
@@ -58,7 +60,6 @@ function TypingDots() {
   );
 }
 
-// small autosize (no libs)
 function useAutosizeTextarea(
   ref: React.RefObject<HTMLTextAreaElement | null>,
   value: string,
@@ -73,6 +74,14 @@ function useAutosizeTextarea(
   }, [ref, value, maxHeight]);
 }
 
+function formatTime(ts: number) {
+  try {
+    return new Date(ts).toLocaleString();
+  } catch {
+    return "";
+  }
+}
+
 export function AIChat({
   location,
   crop,
@@ -82,18 +91,20 @@ export function AIChat({
   dayIndex,
   dataSource,
 }: AIChatProps) {
+  const router = useRouter();
+
   const scrollWrapRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
 
   const [isChecking, setIsChecking] = useState(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  // mobile-də quick prompts default gizli
   const [showPrompts, setShowPrompts] = useState(false);
+  const [showThreads, setShowThreads] = useState(false);
 
   useAutosizeTextarea(textareaRef, input, 180);
 
@@ -110,7 +121,49 @@ export function AIChat({
 
   const cropNameAz = crop?.nameAz || "Bitki";
 
-  // ✅ Health check + welcome
+  // --- store chat threads ---
+  const chatThreads = useAppStore((s) => s.chatThreads);
+  const activeThreadKey = useAppStore((s) => s.activeThreadKey);
+  const ensureThread = useAppStore((s) => s.ensureThread);
+  const setActiveThreadKey = useAppStore((s) => s.setActiveThreadKey);
+  const appendChatMessage = useAppStore((s) => s.appendChatMessage);
+  const clearThread = useAppStore((s) => s.clearThread);
+  const deleteThread = useAppStore((s) => s.deleteThread);
+
+  // thread meta/key current context üçün
+  const computedMeta = useMemo(
+    () => buildThreadMeta(location, crop),
+    [location, crop],
+  );
+  const computedKey = computedMeta.threadKey;
+
+  // context dəyişəndə thread ensure + active et
+  useEffect(() => {
+    ensureThread(computedMeta);
+    setActiveThreadKey(computedKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [computedKey]);
+
+  const activeKey = activeThreadKey || computedKey;
+  const messages = chatThreads[activeKey]?.messages || [];
+  const activeTitle = chatThreads[activeKey]?.meta?.title || computedMeta.title;
+
+  // Auto-scroll (end ref)
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
+
+  // scroll area auto-scroll
+  useEffect(() => {
+    if (!scrollWrapRef.current) return;
+    const viewport = scrollWrapRef.current.querySelector(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLDivElement | null;
+    if (!viewport) return;
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+  }, [messages, isLoading]);
+
+  // Health check + welcome (yalnız thread boşdursa)
   useEffect(() => {
     const checkConnection = async () => {
       try {
@@ -122,14 +175,20 @@ export function AIChat({
 
         if (!res.ok) console.warn("Health check failed:", res.status);
 
-        setMessages([
-          {
+        setConnectionError(null);
+
+        // welcome yalnız boş thread-ə
+        const t = useAppStore.getState().chatThreads[activeKey];
+        if (!t || t.messages.length === 0) {
+          useAppStore.getState().appendChatMessage(activeKey, {
             id: "welcome",
             role: "assistant",
-            content: `Salam! Mən **Bərəkət AI** köməkçisiyəm. 🌾\n\n📌 Məkan + hava + **${cropNameAz}** konteksti ilə sizə dəqiq tövsiyə verəcəyəm.\n\nİstəsəniz: “Bu gün suvarım?”`,
-          },
-        ]);
-        setConnectionError(null);
+            content:
+              `Salam! Mən **Bərəkət AI** köməkçisiyəm.\n\n` +
+              `📌 Məkan + hava + **${cropNameAz}** konteksti ilə sizə dəqiq tövsiyə verəcəyəm.\n\n` +
+              `İstəsəniz: “Bu gün suvarım?”`,
+          });
+        }
       } catch (err) {
         console.error("AI Connection Failed:", err);
         setConnectionError(
@@ -142,18 +201,7 @@ export function AIChat({
 
     checkConnection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cropNameAz]);
-
-  // ✅ Auto-scroll
-  useEffect(() => {
-    if (!scrollWrapRef.current) return;
-    const viewport = scrollWrapRef.current.querySelector(
-      "[data-radix-scroll-area-viewport]",
-    ) as HTMLDivElement | null;
-    if (!viewport) return;
-
-    viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
-  }, [messages, isLoading]);
+  }, [cropNameAz, activeKey]);
 
   const buildContext = useCallback(() => {
     const selectedDay = forecast?.[dayIndex] ?? null;
@@ -243,26 +291,32 @@ export function AIChat({
     async (userText: string) => {
       if (!userText.trim() || isLoading || connectionError || isChecking)
         return;
+      const meta = buildThreadMeta(location, crop);
+      useAppStore.getState().ensureThread(meta);
 
-      const userMessage: Message = {
+      const threadKey =
+        useAppStore.getState().activeThreadKey || meta.threadKey;
+
+      // user msg
+      const userMessage = {
         id: crypto?.randomUUID?.() ?? Date.now().toString(),
-        role: "user",
+        role: "user" as const,
         content: userText.trim(),
       };
 
-      const newMessages = [...messages, userMessage];
-      setMessages(newMessages);
+      appendChatMessage(threadKey, userMessage);
       setIsLoading(true);
-
-      // mobile: prompt-ları göndərəndə gizlət
       setShowPrompts(false);
 
       try {
+        const currentThreadMsgs =
+          useAppStore.getState().chatThreads[threadKey]?.messages || [];
+
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            messages: newMessages.map(({ role, content }) => ({
+            messages: currentThreadMsgs.map(({ role, content }) => ({
               role,
               content,
             })),
@@ -272,14 +326,11 @@ export function AIChat({
 
         if (response.status === 429) {
           const data = await response.json().catch(() => ({}));
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: (Date.now() + 1).toString(),
-              role: "assistant",
-              content: `⚠️ Limit doldu. ${data.retryDelay || "10s"} sonra yenidən yoxlayın.`,
-            },
-          ]);
+          appendChatMessage(threadKey, {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: `⚠️ Limit doldu. ${data.retryDelay || "10s"} sonra yenidən yoxlayın.`,
+          });
           return;
         }
 
@@ -289,30 +340,45 @@ export function AIChat({
         }
 
         const data = await response.json();
-        setMessages((prev) => [
-          ...prev,
-          {
+
+        // Məkan seçilməyibsə /weather-ə yönləndir
+        if (data?.action === "select_location" && data?.redirectTo) {
+          appendChatMessage(threadKey, {
             id: (Date.now() + 1).toString(),
             role: "assistant",
             content: data.text,
-          },
-        ]);
+          });
+
+          setTimeout(() => router.push(data.redirectTo), 2500);
+          return;
+        }
+
+        appendChatMessage(threadKey, {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.text,
+        });
       } catch (error) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content:
-              "❌ **Xəta:** Server xətası oldu. Zəhmət olmasa yenidən yoxlayın.",
-          },
-        ]);
+        appendChatMessage(threadKey, {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content:
+            "❌ **Xəta:** Server xətası oldu. Zəhmət olmasa yenidən yoxlayın.",
+        });
       } finally {
         setIsLoading(false);
         setTimeout(() => textareaRef.current?.focus(), 60);
       }
     },
-    [buildContext, connectionError, isChecking, isLoading, messages],
+    [
+      appendChatMessage,
+      buildContext,
+      computedKey,
+      connectionError,
+      isChecking,
+      isLoading,
+      router,
+    ],
   );
 
   const handleSubmit = async () => {
@@ -332,16 +398,115 @@ export function AIChat({
   const canSend =
     !isLoading && !isChecking && !connectionError && input.trim().length > 0;
 
-  // ---- UI ----
-  // IMPORTANT:
-  // Page layoutın üstündə ContextPreview var → AIChat full height olmalıdı,
-  // amma ContextPreview hündürlüyünü bilmirik. Ona görə "min-h" və "flex-1" istifadə edirik.
-  // ChatPage-də parent (page) flex-col olarsa super olacaq.
+  const sortedThreads = useMemo(() => {
+    return Object.values(chatThreads).sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [chatThreads]);
+
   return (
     <div className="w-full flex flex-col min-h-[72svh] md:min-h-[78vh]">
-      {/* Top bar (ChatGPT vibe, minimal) */}
+      {/* THREADS DRAWER */}
+      {showThreads && (
+        <div className="fixed inset-0 z-[60]">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowThreads(false)}
+            aria-label="Close"
+          />
+          <div className="absolute right-0 top-0 h-full w-[92%] max-w-[420px] bg-background border-l shadow-xl flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between">
+              <div className="font-semibold">Söhbətlər</div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowThreads(false)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="p-3 overflow-auto flex-1 space-y-2">
+              {sortedThreads.length === 0 ? (
+                <div className="text-sm text-muted-foreground p-3">
+                  Hələ söhbət yoxdur.
+                </div>
+              ) : (
+                sortedThreads.map((t) => {
+                  const isActive = t.meta.threadKey === activeKey;
+                  const last = t.messages[t.messages.length - 1];
+
+                  return (
+                    <div
+                      key={t.meta.threadKey}
+                      className={cn(
+                        "rounded-xl border p-3 cursor-pointer hover:bg-muted/40 transition",
+                        isActive && "border-primary bg-muted/30",
+                      )}
+                      onClick={() => {
+                        setActiveThreadKey(t.meta.threadKey);
+                        setShowThreads(false);
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-semibold truncate">
+                            {t.meta.title}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate mt-0.5">
+                            {last
+                              ? `${last.role === "user" ? "Sən: " : "AI: "}${last.content}`
+                              : "Boş söhbət"}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground mt-1">
+                            {formatTime(t.updatedAt)}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          {/* <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              clearThread(t.meta.threadKey);
+                            }}
+                            title="Təmizlə"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button> */}
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteThread(t.meta.threadKey);
+                              
+                            }}
+                            title="Sil"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="p-3 border-t text-xs text-muted-foreground">
+              Thread-lər məkan + bitki kontekstinə görə saxlanılır.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top bar */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b">
-        <div className="mx-auto  px-3 md:px-6 py-3 flex items-center justify-between gap-3">
+        <div className="mx-auto px-3 md:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Bot
               className={cn(
@@ -349,28 +514,47 @@ export function AIChat({
                 connectionError ? "text-red-500" : "text-primary",
               )}
             />
-            <div className="font-semibold truncate">Bərəkət AI</div>
+            <div className="min-w-0">
+              <div className="font-semibold truncate">Bərəkət AI</div>
+              <div className="text-[11px] text-muted-foreground truncate">
+                {activeTitle}
+              </div>
+            </div>
             <Badge variant="secondary" className="hidden sm:inline-flex">
               {cropNameAz}
             </Badge>
           </div>
 
-          {connectionError ? (
-            <Badge variant="destructive" className="gap-1">
-              <WifiOff className="h-3.5 w-3.5" />
-              Offline
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="hidden sm:inline-flex">
-              {dataSource === "firebase" ? "Sensor + Weather" : "Weather"}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {!connectionError && !isChecking && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowThreads(true)}
+                className="gap-2"
+              >
+                <MessageSquareText className="h-4 w-4" />
+                Söhbətlər
+              </Button>
+            )}
+
+            {/* {connectionError ? (
+              <Badge variant="destructive" className="gap-1">
+                <WifiOff className="h-3.5 w-3.5" />
+                Offline
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="hidden sm:inline-flex">
+                {dataSource === "firebase" ? "Sensor + Weather" : "Weather"}
+              </Badge>
+            )} */}
+          </div>
         </div>
 
-        {/* Prompts row: Desktop always visible, Mobile collapsible */}
+        {/* Prompts row */}
         {!connectionError && !isChecking && (
-          <div className="mx-auto  px-3 md:px-6 pb-3">
-            {/* mobile toggle */}
+          <div className="mx-auto px-3 md:px-6 pb-3">
             <div className="flex md:hidden items-center justify-between">
               <button
                 type="button"
@@ -390,7 +574,6 @@ export function AIChat({
               </span>
             </div>
 
-            {/* desktop: chips visible */}
             <div className="hidden md:flex flex-wrap gap-2">
               {quickPrompts.map((p) => (
                 <button
@@ -407,7 +590,6 @@ export function AIChat({
               ))}
             </div>
 
-            {/* mobile: collapsible chips */}
             {showPrompts && (
               <div className="md:hidden mt-2 flex flex-wrap gap-2">
                 {quickPrompts.map((p) => (
@@ -455,7 +637,7 @@ export function AIChat({
           </div>
         ) : (
           <ScrollArea className="h-full" ref={scrollWrapRef}>
-            <div className="mx-auto  px-3 md:px-6 py-6 space-y-6">
+            <div className="mx-auto px-3 md:px-6 py-6 space-y-6">
               {messages.map((m) => (
                 <div
                   key={m.id}
@@ -502,7 +684,6 @@ export function AIChat({
                 </div>
               ))}
 
-              {/* typing indicator only when loading */}
               {isLoading && (
                 <div className="flex justify-start">
                   <div className="max-w-[92%] md:max-w-[78%] bg-muted/50 border border-border/50 rounded-2xl rounded-bl-sm px-3 py-2 md:px-4 md:py-3">
@@ -516,16 +697,15 @@ export function AIChat({
                 </div>
               )}
 
-              {/* spacer so last msg not hidden under composer */}
-              <div className="h-28 md:h-32" />
+              <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
         )}
       </div>
 
-      {/* Composer (sticky bottom) */}
+      {/* Composer */}
       <div className="sticky bottom-0 z-10 bg-background/90 backdrop-blur border-t">
-        <div className="mx-auto  px-3 md:px-6 py-3">
+        <div className="mx-auto px-3 md:px-6 py-3">
           <div className="rounded-2xl border border-border bg-background shadow-sm px-2 py-2 flex items-end gap-2">
             <Textarea
               ref={textareaRef}
@@ -557,7 +737,6 @@ export function AIChat({
             </Button>
           </div>
 
-          {/* helper row: desktop only (mobile-də yuxarıda göstəririk) */}
           <div className="mt-1.5 hidden md:flex items-center justify-between text-[11px] text-muted-foreground">
             <span>Enter: göndər • Shift+Enter: yeni sətir</span>
             <span>

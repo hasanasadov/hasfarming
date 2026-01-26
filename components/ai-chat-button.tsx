@@ -8,10 +8,11 @@ const AIChatButton = () => {
 
   if (isChatPage) return null;
   return (
-    <Link className="animate-pulse" href="/chat">
-      <button className="fixed bottom-4 right-4 bg-green-600 hover:bg-green-700 text-white rounded-full p-4 shadow-lg z-50">
-        <Bot className="h-6 w-6" />
-      </button>
+    <Link
+      className="fixed bottom-4 animate-bounce right-4 bg-green-600 hover:bg-green-700 text-white rounded-full p-4 shadow-lg z-50 duration-300"
+      href="/chat"
+    >
+      <Bot className="h-6 w-6 animate-pulse" />
     </Link>
   );
 };

@@ -27,7 +27,7 @@ export function NextStep() {
     href = "/weather";
   } else {
     step = 3;
-    href = "/"; // go to home when everything is ok
+    href = "/dashboard"; // go to home when everything is ok
   }
 
   return (

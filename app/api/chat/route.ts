@@ -6,7 +6,6 @@ type Role = "user" | "assistant";
 type IncomingMessage = { role: Role; content: string };
 
 function buildSystemPrompt(context: any) {
-  // Context JSON-u AI üçün oxunaqlı veririk
   const ctx = context ? JSON.stringify(context, null, 2) : "{}";
 
   return `
@@ -39,6 +38,12 @@ TONE:
 `.trim();
 }
 
+function hasValidLocation(context: any) {
+  const lat = Number(context?.location?.lat);
+  const lng = Number(context?.location?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng);
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -63,17 +68,24 @@ export async function POST(request: Request) {
     // health-check quota yeməsin
     if (check) return Response.json({ status: "ok" });
 
+    // ✅ Məkan seçilməyibsə, AI çağırma — /weather-ə yönləndir
+    if (!hasValidLocation(context)) {
+      return Response.json({
+        action: "select_location",
+        redirectTo: "/weather",
+        text: "Dəqiq tövsiyə üçün əvvəlcə **Məkan & Hava** bölməsindən məkanı seçin. Sizi indi ora yönləndirirəm.",
+      });
+    }
+
     const url =
       "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent";
 
     const sys = buildSystemPrompt(context);
 
-    // ✅ 1) system prompt ayrıca birinci mesajdır
     const contents: any[] = [
       { role: "user", parts: [{ text: `SİSTEM:\n${sys}` }] },
     ];
 
-    // ✅ 2) sonra chat tarixçəsi gəlir
     for (const m of messages) {
       if (!m?.content?.trim()) continue;
       contents.push({
@@ -109,7 +121,6 @@ export async function POST(request: Request) {
     } catch {}
 
     if (!res.ok) {
-      // 429-u düzgün qaytar
       if (res.status === 429) {
         const retryDelay =
           data?.error?.details?.find((d: any) =>

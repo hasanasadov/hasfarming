@@ -17,7 +17,8 @@ export default function ChatPage() {
   } = useAppStore();
 
   return (
-    <RouteGuard need={["location", "weather", "crop"]}>
+    <div>
+      {/* <RouteGuard need={["location", "weather", "crop"]}> */}
       {/* <div className="space-y-6"> */}
       <ContextPreview />
 
@@ -31,6 +32,7 @@ export default function ChatPage() {
         dataSource={dataSource}
       />
       {/* </div> */}
-    </RouteGuard>
+      {/* </RouteGuard> */}
+    </div>
   );
 }

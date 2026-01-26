@@ -128,7 +128,14 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
                 Nə etməli tətbiqi - Ağıllı Ferma idarəetməsi - Aİ dəstəyi
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={reset}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    confirm(
+                      "Tətbiqi yenidən başlatmaq istədiyinizə əminsiniz?",
+                    ) && reset();
+                  }}
+                >
                   Reset
                 </Button>
                 <ThemeToggle />

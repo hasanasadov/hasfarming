@@ -20,7 +20,7 @@ export function ContextPreview() {
         : "—";
 
   return (
-    <div className="flex items-center gap-3 p-4 md:rounded-xl border border-white/6 bg-white/4 text-xs">
+    <div className="flex items-center gap-3 p-4  md:rounded-xl border border-white/6 bg-white/4 text-xs">
       <div
         className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm"
         style={{ background: "#4b5563" }}
@@ -32,7 +32,7 @@ export function ContextPreview() {
         <div className="truncate font-medium">
           {selectedCrop?.nameAz ?? "Bitki yoxdur"}
         </div>
-        <div className="flex gap-3 text-muted-foreground mt-0.5">
+        <div className="flex gap-1 text-muted-foreground mt-0.5">
           <div className="flex items-center gap-1">
             <span>🌡</span>
             <span>
@@ -52,15 +52,15 @@ export function ContextPreview() {
         </div>
       </div>
 
-      <div className="flex gap-1 md:gap-4">
-        <Button asChild size="sm" variant="outline" className="p-1 md:px-3">
-          <Link href="/weather" aria-label="Məkanı dəyiş">
-            📍 <span className="hidden md:inline-block">Məkanı dəyiş</span>
+      <div className="flex flex-col md:flex-row gap-1 md:gap-4">
+        <Button asChild size="sm" variant="outline" className="p-1 px-2 md:px-3">
+          <Link href="/weather" aria-label="Məkan">
+            📍 <span className="">Məkan</span>
           </Link>
         </Button>
-        <Button asChild size="sm" variant="outline" className="p-1 md:px-3">
+        <Button asChild size="sm" variant="outline" className="p-1 px-2 md:px-3">
           <Link href="/crops" aria-label="Bitkini dəyiş">
-            🌱 <span className="hidden md:inline-block">Bitkini dəyiş</span>
+            🌱 <span className="">Bitki</span>
           </Link>
         </Button>
       </div>

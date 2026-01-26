@@ -283,7 +283,7 @@ export function Recommendations({
         : "Seçilmiş gün";
 
   return (
-    <Card className="border-border/50 shadow-lg">
+    <Card className="border-border/50 shadow-lg py-12">
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <div>

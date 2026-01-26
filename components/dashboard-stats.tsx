@@ -135,7 +135,7 @@ export function DashboardStats({
   const hasNext = activeIndex < forecast.length - 1;
 
   return (
-    <Card className="border-border/50 shadow-lg overflow-hidden">
+    <Card className="border-border/50 shadow-lg overflow-hidden py-12">
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
