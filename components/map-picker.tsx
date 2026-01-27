@@ -7,9 +7,7 @@ import React, {
   useState,
   useCallback,
 } from "react";
-import {
-  Card,
-} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MapPin, ZoomIn, ZoomOut, Crosshair, Loader2 } from "lucide-react";
 import type { Location } from "@/lib/types";
@@ -28,29 +26,29 @@ function clamp(n: number, min: number, max: number) {
 }
 
 function wrapLng(lng: number) {
-  // -180..180
   return ((lng + 540) % 360) - 180;
 }
 
 function latLngToWorldPx(lat: number, lng: number, zoom: number) {
   const scale = TILE_SIZE * Math.pow(2, zoom);
-
   const siny = clamp(Math.sin((lat * Math.PI) / 180), -0.9999, 0.9999);
-
   const x = ((lng + 180) / 360) * scale;
   const y = (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) * scale;
-
   return { x, y, scale };
 }
 
 function worldPxToLatLng(x: number, y: number, zoom: number) {
   const scale = TILE_SIZE * Math.pow(2, zoom);
-
   const lng = (x / scale) * 360 - 180;
   const n = Math.PI - (2 * Math.PI * y) / scale;
   const lat = (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
-
   return { lat: clamp(lat, -85.0511, 85.0511), lng: wrapLng(lng) };
+}
+
+// UI region check: if event originated from a UI overlay, ignore map click
+function isFromMapUI(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+  return !!target.closest('[data-map-ui="1"]');
 }
 
 export function MapPicker({
@@ -79,7 +77,6 @@ export function MapPicker({
 
   useEffect(() => {
     if (!mapRef.current) return;
-
     const checkSize = () => {
       if (
         mapRef.current &&
@@ -89,7 +86,6 @@ export function MapPicker({
         setMapReady(true);
       }
     };
-
     checkSize();
     window.addEventListener("resize", checkSize);
     return () => window.removeEventListener("resize", checkSize);
@@ -107,10 +103,8 @@ export function MapPicker({
 
   const getVisibleTiles = useCallback(() => {
     if (!mapRef.current) return [];
-
     const w = mapRef.current.clientWidth;
     const h = mapRef.current.clientHeight;
-
     const halfW = w / 2;
     const halfH = h / 2;
 
@@ -135,7 +129,6 @@ export function MapPicker({
         tiles.push({ x: wrappedX, y: ty, z: zoom });
       }
     }
-
     return tiles;
   }, [centerWorld, zoom]);
 
@@ -143,17 +136,12 @@ export function MapPicker({
 
   const tileToScreen = useCallback(
     (tileX: number, tileY: number) => {
-      // tile top-left world px
       const tileWorldX = tileX * TILE_SIZE;
       const tileWorldY = tileY * TILE_SIZE;
-
       const w = mapRef.current?.clientWidth ?? 0;
       const h = mapRef.current?.clientHeight ?? 0;
-
-      // screen origin is center
       const left = w / 2 + (tileWorldX - centerWorld.x);
       const top = h / 2 + (tileWorldY - centerWorld.y);
-
       return { left, top };
     },
     [centerWorld],
@@ -161,90 +149,55 @@ export function MapPicker({
 
   const markerToScreen = useCallback(() => {
     if (!marker || !mapRef.current) return null;
-
     const w = mapRef.current.clientWidth;
     const h = mapRef.current.clientHeight;
-
     const mWorld = latLngToWorldPx(marker.lat, marker.lng, zoom);
-
     const x = w / 2 + (mWorld.x - centerWorld.x);
     const y = h / 2 + (mWorld.y - centerWorld.y);
-
     return { x, y };
   }, [marker, zoom, centerWorld]);
 
-  // ---------- interactions ----------
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX, y: e.clientY });
-    dragDistance.current = 0;
-  };
+  // ✅ click-select only on pointer up (and only if not dragging, and not from UI overlay)
+  const pickAtPointer = useCallback(
+    async (clientX: number, clientY: number) => {
+      if (!mapRef.current) return;
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !mapRef.current) return;
+      const rect = mapRef.current.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
 
-    const dx = e.clientX - dragStart.x;
-    const dy = e.clientY - dragStart.y;
-    dragDistance.current += Math.abs(dx) + Math.abs(dy);
+      const w = rect.width;
+      const h = rect.height;
 
-    // pixel drag -> world pixel shift
-    const newCenterWorldX = centerWorld.x - dx;
-    const newCenterWorldY = centerWorld.y - dy;
+      const worldX = centerWorld.x + (x - w / 2);
+      const worldY = centerWorld.y + (y - h / 2);
 
-    const ll = worldPxToLatLng(newCenterWorldX, newCenterWorldY, zoom);
-    setMapCenter(ll);
+      const { lat, lng } = worldPxToLatLng(worldX, worldY, zoom);
 
-    setDragStart({ x: e.clientX, y: e.clientY });
-  };
+      setMarker({ lat, lng });
+      setIsLoading(true);
+      isInternalChange.current = true;
 
-  const handleMouseUp = () => setIsDragging(false);
-
-  const handleClick = async (e: React.MouseEvent) => {
-    if (!mapRef.current) return;
-
-    // drag edibsə click sayma
-    if (dragDistance.current > 6) {
-      dragDistance.current = 0;
-      return;
-    }
-    dragDistance.current = 0;
-
-    const rect = mapRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const w = rect.width;
-    const h = rect.height;
-
-    // screen -> world px
-    const worldX = centerWorld.x + (x - w / 2);
-    const worldY = centerWorld.y + (y - h / 2);
-
-    const { lat, lng } = worldPxToLatLng(worldX, worldY, zoom);
-
-    setMarker({ lat, lng });
-    setIsLoading(true);
-    isInternalChange.current = true;
-
-    try {
-      const r = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
-      const data = await r.json();
-
-      onLocationSelect({
-        lat,
-        lng,
-        address: data.address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
-      });
-    } catch {
-      onLocationSelect({
-        lat,
-        lng,
-        address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      try {
+        const r = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
+        const data = await r.json();
+        onLocationSelect({
+          lat,
+          lng,
+          address: data.address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        });
+      } catch {
+        onLocationSelect({
+          lat,
+          lng,
+          address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [centerWorld.x, centerWorld.y, zoom, onLocationSelect],
+  );
 
   const handleZoomIn = () => setZoom((z) => Math.min(18, z + 1));
   const handleZoomOut = () => setZoom((z) => Math.max(1, z - 1));
@@ -276,12 +229,19 @@ export function MapPicker({
   const markerScreen = markerToScreen();
 
   return (
-    <Card className="border-border/50 shadow-lg overflow-hidden p-0">
+    <Card className="border-border/50 shadow-lg rounded-xl overflow-hidden !p-0">
       <div
         ref={mapRef}
-        className={`relative w-full touch-none h-80 md:h-96 rounded-xl overflow-hidden border border-border bg-muted select-none
-          ${isDragging ? "cursor-grabbing" : "cursor-crosshair"}`}
+        className={`
+          relative w-full h-80 md:h-96 overflow-hidden
+          border border-border bg-muted select-none
+          ${isDragging ? "cursor-grabbing" : "cursor-crosshair"}
+        `}
+        // ✅ Use pointer events only; NO onClick
         onPointerDown={(e) => {
+          // if press starts on UI overlay -> do not drag map
+          if (isFromMapUI(e.target)) return;
+
           mapRef.current?.setPointerCapture(e.pointerId);
           setIsDragging(true);
           setDragStart({ x: e.clientX, y: e.clientY });
@@ -302,9 +262,28 @@ export function MapPicker({
 
           setDragStart({ x: e.clientX, y: e.clientY });
         }}
-        onPointerUp={() => setIsDragging(false)}
+        onPointerUp={(e) => {
+          // release drag
+          const wasDragging = isDragging;
+          setIsDragging(false);
+
+          // If pointer up happened on UI overlay -> ignore
+          if (isFromMapUI(e.target)) {
+            dragDistance.current = 0;
+            return;
+          }
+
+          // If it was a drag, don't treat as click
+          if (wasDragging && dragDistance.current > 6) {
+            dragDistance.current = 0;
+            return;
+          }
+
+          // Otherwise, treat as click-select
+          dragDistance.current = 0;
+          pickAtPointer(e.clientX, e.clientY);
+        }}
         onPointerCancel={() => setIsDragging(false)}
-        onClick={handleClick}
       >
         <div className="absolute inset-0">
           {tiles.map((t) => {
@@ -348,16 +327,10 @@ export function MapPicker({
           </div>
         )}
 
+        {/* ✅ UI overlay marked with data-map-ui */}
         <div
-          className="absolute top-3 right-3 z-20 pointer-events-auto"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
+          data-map-ui="1"
+          className="absolute top-3 right-3 z-30 pointer-events-auto"
         >
           <div className="rounded-2xl border border-border/60 bg-card/75 backdrop-blur shadow-lg p-1 flex flex-col gap-1">
             <Button
@@ -365,15 +338,8 @@ export function MapPicker({
               size="icon"
               variant="secondary"
               className="h-9 w-9"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleZoomIn();
-              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => handleZoomIn()}
             >
               <ZoomIn className="h-4 w-4" />
             </Button>
@@ -383,15 +349,8 @@ export function MapPicker({
               size="icon"
               variant="secondary"
               className="h-9 w-9"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleZoomOut();
-              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => handleZoomOut()}
             >
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -401,15 +360,8 @@ export function MapPicker({
               size="icon"
               variant="secondary"
               className="h-9 w-9 mt-1"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                centerOnLocation();
-              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => centerOnLocation()}
             >
               <Crosshair className="h-4 w-4" />
             </Button>

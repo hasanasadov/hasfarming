@@ -220,7 +220,7 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
                   className="gap-2 rounded-xl"
                 >
                   <RotateCcw className="h-4 w-4" />
-                  Reset
+                  Yenidən başlat
                 </Button>
                 <ThemeToggle />
               </div>
@@ -277,11 +277,11 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
               </Button>
             </Link>
 
-            <Link href="/chat" aria-label="AI Söhbət">
+            {/* <Link href="/chat" aria-label="AI Söhbət">
               <Button variant="outline" size="sm" className="rounded-xl">
                 AI
               </Button>
-            </Link>
+            </Link> */}
 
             <ThemeToggle />
           </div>

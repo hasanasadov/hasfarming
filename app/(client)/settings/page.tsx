@@ -1,4 +1,3 @@
-// app/(app)/settings/page.tsx
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
@@ -18,6 +17,9 @@ import {
   Database,
   Loader2,
   Link2,
+  Cloud,
+  Radio,
+  RotateCcw,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { FirebaseSensorDisplay } from "@/components/firebase-sensor-display";
@@ -35,6 +37,8 @@ function isFirebaseLike(u: string) {
   return u.includes("firebaseio.com") || u.includes("firebasedatabase.app");
 }
 
+type UiState = "idle" | "testing" | "ok" | "error" | "connected";
+
 export default function SettingsPage() {
   const {
     dataSource,
@@ -50,24 +54,28 @@ export default function SettingsPage() {
   const [url, setUrl] = useState(
     firebaseUrl || "https://agrowise-c3772-default-rtdb.firebaseio.com",
   );
-  const [isValidating, setIsValidating] = useState(false);
-  const [ok, setOk] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
 
   const cleaned = useMemo(() => normalizeFirebaseBaseUrl(url), [url]);
   const connected = dataSource === "firebase" && !!firebaseUrl;
 
+  const [ui, setUi] = useState<UiState>(connected ? "connected" : "idle");
+  const [err, setErr] = useState<string | null>(null);
+
   const validate = useCallback(async () => {
     setErr(null);
-    setOk(false);
 
-    if (!cleaned) return setErr("Firebase URL daxil edin");
-    if (!isFirebaseLike(cleaned))
+    if (!cleaned) {
+      setUi("error");
+      return setErr("Firebase URL daxil edin.");
+    }
+    if (!isFirebaseLike(cleaned)) {
+      setUi("error");
       return setErr(
-        "Realtime Database URL düzgün deyil (firebaseio.com olmalıdır)",
+        "Realtime Database URL düzgün deyil (firebaseio.com olmalıdır).",
       );
+    }
 
-    setIsValidating(true);
+    setUi("testing");
 
     try {
       const res = await fetch(
@@ -76,17 +84,14 @@ export default function SettingsPage() {
       );
 
       const data = await res.json().catch(() => null);
+      if (!data) throw new Error("Yoxlama cavabı alınmadı.");
+      if (!data.ok) throw new Error(data.error || "Yoxlama uğursuz oldu.");
 
-      if (!data) throw new Error("Validate cavabı boş gəldi");
-      if (!data.ok) throw new Error(data.error || "Validate alınmadı");
-
-      setOk(true);
+      setUi("ok");
       setErr(null);
     } catch (e: any) {
-      setOk(false);
+      setUi("error");
       setErr(e?.message || "Yoxlama alınmadı. URL / Rules problemi ola bilər.");
-    } finally {
-      setIsValidating(false);
     }
   }, [cleaned]);
 
@@ -95,7 +100,7 @@ export default function SettingsPage() {
     setFirebaseUrl(cleaned);
     setDataSource("firebase");
     localStorage.setItem("agrisense_firebase_url", cleaned);
-    setOk(true);
+    setUi("connected");
     setErr(null);
   }, [cleaned, setFirebaseUrl, setDataSource]);
 
@@ -103,102 +108,189 @@ export default function SettingsPage() {
     setFirebaseUrl("");
     setDataSource("weather");
     localStorage.removeItem("agrisense_firebase_url");
-    setOk(false);
+    setUi("idle");
     setErr(null);
     setSensorData(null);
     setSensorStatus("idle");
   }, [setFirebaseUrl, setDataSource, setSensorData, setSensorStatus]);
 
+  const statusBadge = useMemo(() => {
+    if (ui === "testing")
+      return (
+        <Badge variant="secondary" className="gap-1 rounded-full">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Yoxlanır
+        </Badge>
+      );
+    if (ui === "ok")
+      return (
+        <Badge variant="secondary" className="gap-1 rounded-full">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Hazırdır
+        </Badge>
+      );
+    if (ui === "connected")
+      return (
+        <Badge variant="outline" className="gap-1 rounded-full">
+          <Link2 className="h-3.5 w-3.5" />
+          Qoşulub
+        </Badge>
+      );
+    if (ui === "error")
+      return (
+        <Badge variant="destructive" className="rounded-full">
+          Problem
+        </Badge>
+      );
+    return (
+      <Badge variant="secondary" className="rounded-full">
+        Passiv
+      </Badge>
+    );
+  }, [ui]);
+
   return (
-    <div className="space-y-6">
-      <Card className="border-border/50 shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="h-5 w-5 text-primary" />
-            Data Sources
-          </CardTitle>
-          <CardDescription>
-            Sensorunuz varsa qoşun. Yoxdursa problem deyil — sistem Weather API
-            ilə işləyir.
-          </CardDescription>
-        </CardHeader>
+    <div className="space-y-6  md:px-0">
+      <Card className="relative overflow-hidden border-border/60 bg-background/60 backdrop-blur">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-muted/40 via-background to-background" />
 
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <Badge variant={dataSource === "weather" ? "default" : "secondary"}>
-              ☁️ Weather API
-            </Badge>
-            <Badge
-              variant={dataSource === "firebase" ? "default" : "secondary"}
-            >
-              📡 Sensors (Firebase)
-            </Badge>
+        <CardHeader className="relative">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/40">
+                  <Database className="h-4 w-4" />
+                </span>
+                Məlumat mənbəyi
+              </CardTitle>
+              <CardDescription>
+                Sensor varsa qoşa bilərsən. Yoxdursa da problem deyil — sistem
+                proqnoz ilə işləyəcək.
+              </CardDescription>
+            </div>
 
-            {connected && (
-              <Badge variant="outline" className="gap-1">
-                <Link2 className="h-3 w-3" />
-                Qoşulub
-              </Badge>
-            )}
-
-            {sensorStatus === "error" && (
-              <Badge variant="destructive">Sensor Error</Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {sensorStatus === "error" && (
+                <Badge variant="destructive" className="rounded-full">
+                  Sensor xətası
+                </Badge>
+              )}
+              {statusBadge}
+            </div>
           </div>
 
-          <div className="p-4 rounded-xl border bg-muted/20 space-y-3">
-            <div className="text-sm font-medium">
-              Məndə sensor var (optional)
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Firebase Realtime Database URL verin, yoxlama edin və
-              aktivləşdirin.
+          {/* source pills */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Badge
+              variant={dataSource === "weather" ? "default" : "secondary"}
+              className="gap-1 rounded-full"
+            >
+              <Cloud className="h-3.5 w-3.5" />
+              Proqnoz (Weather API)
+            </Badge>
+
+            <Badge
+              variant={dataSource === "firebase" ? "default" : "secondary"}
+              className="gap-1 rounded-full"
+            >
+              <Radio className="h-3.5 w-3.5" />
+              Sensor (Firebase)
+            </Badge>
+
+            {connected && firebaseUrl && (
+              <Badge variant="outline" className="gap-1 rounded-full">
+                <Link2 className="h-3.5 w-3.5" />
+                Aktiv
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+
+        <CardContent className="relative space-y-4 pb-6">
+          {/* Sensor setup block */}
+          <div className="rounded-2xl border bg-background/60 p-4 md:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <div className="text-sm font-semibold">
+                  Sensor qoşmaq (istəyə bağlı)
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Firebase Realtime Database URL ver, test et və istəsən
+                  aktivləşdir.
+                </div>
+              </div>
+
+              {/* small help hint */}
+              <Badge variant="secondary" className="rounded-full">
+                1 dəqiqə
+              </Badge>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
               <Input
                 value={url}
                 onChange={(e) => {
                   setUrl(e.target.value);
-                  setOk(false);
+                  setUi(connected ? "connected" : "idle");
                   setErr(null);
                 }}
-                placeholder="https://agrowise-c3772-default-rtdb.firebaseio.com"
+                placeholder="https://xxxx-default-rtdb.firebaseio.com"
+                className="rounded-xl"
               />
 
               <Button
                 onClick={validate}
                 variant="secondary"
-                disabled={isValidating || !cleaned}
-                className="shrink-0"
+                disabled={ui === "testing" || !cleaned}
+                className="rounded-xl"
               >
-                {isValidating ? (
+                {ui === "testing" ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Test...
+                    Test edilir
                   </>
                 ) : (
-                  "Test"
+                  "Test et"
                 )}
               </Button>
             </div>
 
-            {err && (
-              <div className="flex items-center gap-2 text-sm text-destructive">
-                <AlertCircle className="h-4 w-4" />
-                {err}
-              </div>
-            )}
+            {/* status messages */}
+            <div className="mt-3 space-y-2">
+              {err && (
+                <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 mt-0.5" />
+                  <div className="leading-relaxed">{err}</div>
+                </div>
+              )}
 
-            {ok && (
-              <div className="flex items-center gap-2 text-sm text-primary">
-                <CheckCircle2 className="h-4 w-4" />
-                Uğurlu! Aktivləşdirə bilərsiniz.
-              </div>
-            )}
+              {ui === "ok" && (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Yoxlama uğurludur — aktivləşdirə bilərsən.
+                </div>
+              )}
 
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button onClick={enableSensors} disabled={!ok}>
+              {firebaseUrl && (
+                <div className="rounded-xl border bg-muted/20 px-3 py-2 text-xs text-muted-foreground break-all">
+                  Aktiv URL: {firebaseUrl}
+                </div>
+              )}
+
+              {sensorError && (
+                <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive break-all">
+                  Sensor error: {sensorError}
+                </div>
+              )}
+            </div>
+
+            {/* actions */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                onClick={enableSensors}
+                disabled={ui !== "ok"}
+                className="rounded-xl"
+              >
                 Save & Use Sensors
               </Button>
 
@@ -206,24 +298,15 @@ export default function SettingsPage() {
                 onClick={disableSensors}
                 variant="outline"
                 disabled={!connected}
+                className="rounded-xl"
               >
-                Disable Sensors
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Sensordan çıx
               </Button>
             </div>
-
-            {firebaseUrl && (
-              <div className="text-xs text-muted-foreground pt-2 break-all">
-                Aktiv URL: {firebaseUrl}
-              </div>
-            )}
-
-            {sensorError && (
-              <div className="text-xs text-destructive pt-1">
-                Sensor error: {sensorError}
-              </div>
-            )}
           </div>
 
+          {/* Live sensor display */}
           {dataSource === "firebase" && firebaseUrl && (
             <FirebaseSensorDisplay
               firebaseUrl={firebaseUrl}

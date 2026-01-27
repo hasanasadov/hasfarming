@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   MapPin,
   Navigation,
@@ -20,9 +21,14 @@ import {
   ChevronDown,
   ChevronUp,
   SlidersHorizontal,
+  Map as MapIcon,
+  CheckCircle2,
+  AlertTriangle,
+  Copy,
 } from "lucide-react";
 import type { Location } from "@/lib/types";
 import { MapPicker } from "./map-picker";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface LocationPickerProps {
   onLocationSelect: (location: Location) => void;
@@ -32,8 +38,6 @@ interface LocationPickerProps {
 type SearchResult = { lat: number; lng: number; display_name: string };
 
 function normalizeQuery(q: string) {
-  // AZ/TR yazılarını “axtarış üçün” daha stabil edir
-  // (Nominatim bəzən “ş/ə/ğ/ı” ilə qəribə davranır)
   const map: Record<string, string> = {
     ə: "e",
     Ə: "e",
@@ -57,8 +61,6 @@ function normalizeQuery(q: string) {
     .trim();
 }
 
-// çox yüngül “fuzzy” (display_name daxilində oxşarlıq)
-// Nominatim 0 nəticə verəndə ən azı əvvəlki nəticələrdən kömək edir
 function levenshtein(a: string, b: string) {
   const s = a.toLowerCase();
   const t = b.toLowerCase();
@@ -80,6 +82,32 @@ function levenshtein(a: string, b: string) {
   return dp[m][n];
 }
 
+function cx(...x: Array<string | false | null | undefined>) {
+  return x.filter(Boolean).join(" ");
+}
+
+const MotionSection = ({
+  show,
+  children,
+}: {
+  show: boolean;
+  children: React.ReactNode;
+}) => (
+  <AnimatePresence initial={false}>
+    {show && (
+      <motion.div
+        initial={{ height: 0, opacity: 0 }}
+        animate={{ height: "auto", opacity: 1 }}
+        exit={{ height: 0, opacity: 0 }}
+        transition={{ duration: 0.22, ease: "easeOut" }}
+        className="overflow-hidden"
+      >
+        <div className="pt-3">{children}</div>
+      </motion.div>
+    )}
+  </AnimatePresence>
+);
+
 export function LocationPicker({
   onLocationSelect,
   selectedLocation,
@@ -95,36 +123,31 @@ export function LocationPicker({
   const [isResolvingManual, setIsResolvingManual] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  // ✅ yeni: axtarış / manual bölməsi açılıb-bağlansın
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
 
-  // ✅ son “uğurlu” nəticələri saxla (fuzzy fallback üçün)
   const lastSuccessfulResults = useRef<SearchResult[]>([]);
 
-  const reverseGeocode = useCallback(
-    async (lat: number, lng: number): Promise<string> => {
-      try {
-        const response = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
-        if (response.ok) {
-          const data = await response.json();
-          return data.address || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-        }
-      } catch (e) {
-        console.error("Reverse geocoding error:", e);
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.address || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
       }
-      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-    },
-    [],
-  );
+    } catch {}
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  }, []);
 
   const getLiveLocation = useCallback(async () => {
     setIsGettingLocation(true);
     setError(null);
+    setNotice(null);
 
     if (!navigator.geolocation) {
-      setError("Brauzeriniz geolokasiya dəstəkləmir");
+      setError("Brauzeriniz geolokasiya dəstəkləmir.");
       setIsGettingLocation(false);
       return;
     }
@@ -135,10 +158,10 @@ export function LocationPicker({
         const address = await reverseGeocode(latitude, longitude);
         onLocationSelect({ lat: latitude, lng: longitude, address });
         setIsGettingLocation(false);
+        setNotice("Məkan seçildi.");
       },
-      (err) => {
-        console.error("Geolocation error:", err);
-        setError("Məkan əldə edilə bilmədi. Zəhmət olmasa icazə verin.");
+      () => {
+        setError("Məkanı ala bilmədik. İcazə verdiyinizə əmin olun.");
         setIsGettingLocation(false);
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
@@ -154,22 +177,24 @@ export function LocationPicker({
       });
       setSearchResults([]);
       setError(null);
+      setNotice("Məkan seçildi.");
     },
     [onLocationSelect],
   );
 
   const handleManualInput = useCallback(async () => {
     setError(null);
+    setNotice(null);
 
     const lat = parseFloat(manualLat);
     const lng = parseFloat(manualLng);
 
     if (Number.isNaN(lat) || Number.isNaN(lng)) {
-      setError("Düzgün koordinatlar daxil edin");
+      setError("Düzgün koordinatlar daxil edin.");
       return;
     }
     if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      setError("Koordinatlar sərhəddən kənardır");
+      setError("Koordinatlar sərhəddən kənardır.");
       return;
     }
 
@@ -180,16 +205,16 @@ export function LocationPicker({
 
     setManualLat("");
     setManualLng("");
+    setNotice("Məkan seçildi.");
   }, [manualLat, manualLng, onLocationSelect, reverseGeocode]);
 
   const runSearch = useCallback(async (raw: string) => {
     const q0 = raw.trim();
     if (!q0) return;
 
-    // çox qısa query = spam kimi olur
     if (q0.length < 2) {
       setSearchResults([]);
-      setError("Ən az 2 simvol yazın");
+      setError("Ən az 2 simvol yazın.");
       return;
     }
 
@@ -197,12 +222,11 @@ export function LocationPicker({
 
     setIsSearching(true);
     setError(null);
+    setNotice(null);
     setSearchResults([]);
 
     try {
-      // ✅ Azerbaijan bias: viewbox + bounded=1 + countrycodes=az
-      // viewbox: (lng_left, lat_top, lng_right, lat_bottom)
-      const viewbox = "44.7,41.95,51.0,38.2"; // AZ roughly
+      const viewbox = "44.7,41.95,51.0,38.2";
       const url =
         `https://nominatim.openstreetmap.org/search?format=json` +
         `&q=${encodeURIComponent(q)}` +
@@ -212,8 +236,7 @@ export function LocationPicker({
       const response = await fetch(url, {
         headers: { "User-Agent": "AgriSense Smart Farming App" },
       });
-
-      if (!response.ok) throw new Error("Axtarış uğursuz oldu");
+      if (!response.ok) throw new Error("Axtarış uğursuz oldu.");
 
       const data = await response.json();
       const mapped: SearchResult[] = (data || []).map(
@@ -227,9 +250,7 @@ export function LocationPicker({
       if (mapped.length > 0) {
         setSearchResults(mapped);
         lastSuccessfulResults.current = mapped;
-        setError(null);
       } else {
-        // ✅ fallback: son nəticələrdən fuzzy filter
         const pool = lastSuccessfulResults.current || [];
         const scored = pool
           .map((r) => ({
@@ -245,20 +266,19 @@ export function LocationPicker({
 
         if (scored.length > 0) {
           setSearchResults(scored);
-          setError("Tam uyğun nəticə tapılmadı — oxşar yerlər göstərildi.");
+          setNotice("Tam uyğun nəticə tapılmadı — oxşar yerlər göstərildi.");
         } else {
-          setError("Heç bir nəticə tapılmadı");
+          setError("Heç bir nəticə tapılmadı.");
         }
       }
-    } catch (e) {
-      console.error("Search error:", e);
-      setError("Axtarış zamanı xəta baş verdi");
+    } catch {
+      setError("Axtarış zamanı xəta baş verdi.");
     } finally {
       setIsSearching(false);
     }
   }, []);
 
-  // ✅ debounce auto-search
+  // debounce auto-search
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) {
@@ -267,47 +287,96 @@ export function LocationPicker({
       return;
     }
 
-    const id = window.setTimeout(() => {
-      runSearch(q);
-    }, 450);
-
+    const id = window.setTimeout(() => runSearch(q), 450);
     return () => window.clearTimeout(id);
   }, [searchQuery, runSearch]);
 
   const resultsTitle = useMemo(() => {
-    if (isSearching) return "Axtarılır...";
+    if (isSearching) return "Axtarılır…";
     if (searchResults.length > 0) return "Nəticələr";
     return null;
   }, [isSearching, searchResults.length]);
 
+  const copyCoords = useCallback(async () => {
+    if (!selectedLocation) return;
+    const text = `${selectedLocation.lat.toFixed(6)}, ${selectedLocation.lng.toFixed(6)}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice("Koordinatlar kopyalandı.");
+      setError(null);
+    } catch {
+      setNotice(null);
+      setError("Kopyalama mümkün olmadı.");
+    }
+  }, [selectedLocation]);
+
   return (
-    <Card className="border-border/50 shadow-lg overflow-hidden">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2 text-foreground">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
-            <MapPin className="h-5 w-5 text-primary" />
+    <Card className="relative overflow-hidden border-border/60 bg-background/60 backdrop-blur">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-muted/40 via-background to-background" />
+
+      <CardHeader className="relative pb-4">
+        <CardTitle className="flex items-center gap-2">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/40">
+            <MapPin className="h-4 w-4" />
           </span>
           Məkan seçimi
         </CardTitle>
         <CardDescription>
-          Canlı məkan seçin, axtarın və ya koordinatla daxil edin.
+          Canlı məkan götür, ünvanla axtar, xəritədən seç və ya koordinat daxil
+          et.
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-6">
+      <CardContent className="relative space-y-5">
+        {/* Selected summary (top) */}
+        {selectedLocation && (
+          <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Badge className="rounded-full" variant="secondary">
+                    Seçildi
+                  </Badge>
+                  <div className="text-sm font-semibold text-foreground truncate">
+                    {selectedLocation.address || "Seçilmiş məkan"}
+                  </div>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {selectedLocation.lat.toFixed(6)},{" "}
+                  {selectedLocation.lng.toFixed(6)}
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="rounded-xl shrink-0"
+                onClick={copyCoords}
+                title="Koordinatları kopyala"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Live Location */}
-        <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+        <div className="rounded-2xl border bg-background/60 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground">Canlı məkan</p>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">
+                Canlı məkan
+              </p>
               <p className="text-xs text-muted-foreground">
                 GPS ilə dəqiq məkanınız götürüləcək.
               </p>
             </div>
+
             <Button
               onClick={getLiveLocation}
               disabled={isGettingLocation}
-              className="gap-2"
+              className="gap-2 rounded-xl"
             >
               {isGettingLocation ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -319,43 +388,74 @@ export function LocationPicker({
           </div>
         </div>
 
-        {/* Advanced (Search + Manual) Toggle */}
+        {/* Advanced toggle */}
         <button
           type="button"
           onClick={() => setIsAdvancedOpen((s) => !s)}
-          className="w-full rounded-xl border border-border/60 bg-card hover:bg-muted/30 transition-colors px-4 py-3 flex items-center justify-between"
+          className={cx(
+            "w-full rounded-2xl border bg-background/60 px-4 py-3",
+            "hover:bg-muted/30 transition-colors",
+          )}
         >
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4 text-primary" />
-            <div className="text-left">
-              <p className="text-sm font-medium text-foreground">
-                Axtarış / Əl ilə daxil et
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Ünvan axtarın və ya koordinat yazın
-              </p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/30">
+                <SlidersHorizontal className="h-4 w-4" />
+              </span>
+              <div className="text-left">
+                <p className="text-sm font-semibold text-foreground">
+                  Axtarış / Koordinat
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Ünvan axtar və ya əl ilə daxil et
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="rounded-full">
+                {isAdvancedOpen ? "Açıq" : "Bağlı"}
+              </Badge>
+              {isAdvancedOpen ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
             </div>
           </div>
-          {isAdvancedOpen ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          )}
         </button>
-        {isAdvancedOpen && (
-          <div className="space-y-6">
-            {/* Search */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">Axtarış</p>
 
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Məs: Bakı, X parkı, Sumqayıt..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && runSearch(searchQuery)}
-                  className="flex-1"
-                />
+        <MotionSection show={isAdvancedOpen}>
+          <div className="space-y-5">
+            {/* Search */}
+            <div className="rounded-2xl border bg-background/60 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    Axtarış
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Məs: Bakı, Sumqayıt, park, kənd…
+                  </p>
+                </div>
+                <Badge className="rounded-full" variant="secondary">
+                  AZ bias
+                </Badge>
+              </div>
+
+              <div className="mt-3 flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Axtarın…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && runSearch(searchQuery)
+                    }
+                    className="pl-9 rounded-xl"
+                  />
+                </div>
 
                 {searchQuery.trim().length > 0 && (
                   <Button
@@ -365,8 +465,9 @@ export function LocationPicker({
                       setSearchQuery("");
                       setSearchResults([]);
                       setError(null);
+                      setNotice(null);
                     }}
-                    className="px-3"
+                    className="rounded-xl px-3"
                     title="Təmizlə"
                   >
                     <X className="h-4 w-4" />
@@ -378,7 +479,7 @@ export function LocationPicker({
                   onClick={() => runSearch(searchQuery)}
                   disabled={isSearching}
                   variant="secondary"
-                  className="gap-2"
+                  className="gap-2 rounded-xl"
                 >
                   {isSearching ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -389,50 +490,55 @@ export function LocationPicker({
                 </Button>
               </div>
 
-              {(resultsTitle || searchResults.length > 0) && (
-                <div className="rounded-xl border border-border bg-card overflow-hidden">
-                  {resultsTitle && (
-                    <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border/70">
-                      {resultsTitle}
+              <div className="mt-3 rounded-2xl border bg-card/40 overflow-hidden">
+                {resultsTitle && (
+                  <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border/70">
+                    {resultsTitle}
+                  </div>
+                )}
+
+                <div className="max-h-60 overflow-auto">
+                  {searchResults.map((r, idx) => (
+                    <button
+                      key={`${r.lat}-${r.lng}-${idx}`}
+                      onClick={() => selectSearchResult(r)}
+                      className="w-full text-left px-4 py-3 hover:bg-muted/60 transition-colors border-b border-border last:border-b-0"
+                    >
+                      <p className="text-sm text-foreground line-clamp-2">
+                        {r.display_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {r.lat.toFixed(5)}, {r.lng.toFixed(5)}
+                      </p>
+                    </button>
+                  ))}
+
+                  {searchResults.length === 0 && !isSearching && (
+                    <div className="px-4 py-3 text-sm text-muted-foreground">
+                      Yazmağa başlayın (ən az 2 simvol).
                     </div>
                   )}
-                  <div className="max-h-56 overflow-auto">
-                    {searchResults.map((r, idx) => (
-                      <button
-                        key={`${r.lat}-${r.lng}-${idx}`}
-                        onClick={() => selectSearchResult(r)}
-                        className="w-full text-left px-4 py-3 hover:bg-muted/60 transition-colors border-b border-border last:border-b-0"
-                      >
-                        <p className="text-sm text-foreground line-clamp-2">
-                          {r.display_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {r.lat.toFixed(5)}, {r.lng.toFixed(5)}
-                        </p>
-                      </button>
-                    ))}
-                    {searchResults.length === 0 && !isSearching && (
-                      <div className="px-4 py-3 text-sm text-muted-foreground">
-                        Yazmağa başlayın (ən az 2 simvol).
-                      </div>
-                    )}
-                  </div>
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* Manual */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">
+            {/* Manual coords */}
+            <div className="rounded-2xl border bg-background/60 p-4">
+              <p className="text-sm font-semibold text-foreground">
                 Koordinatla seçim
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
+              <p className="text-xs text-muted-foreground mt-1">
+                Enlik (lat) və uzunluq (lng) daxil edin.
+              </p>
+
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
                 <Input
                   placeholder="Enlik (lat)"
                   value={manualLat}
                   onChange={(e) => setManualLat(e.target.value)}
                   type="number"
                   step="any"
+                  className="rounded-xl"
                 />
                 <Input
                   placeholder="Uzunluq (lng)"
@@ -440,13 +546,14 @@ export function LocationPicker({
                   onChange={(e) => setManualLng(e.target.value)}
                   type="number"
                   step="any"
+                  className="rounded-xl"
                 />
                 <Button
                   type="button"
                   onClick={handleManualInput}
                   disabled={isResolvingManual}
                   variant="secondary"
-                  className="gap-2"
+                  className="gap-2 rounded-xl"
                 >
                   {isResolvingManual ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -458,60 +565,88 @@ export function LocationPicker({
               </div>
             </div>
           </div>
-        )}
+        </MotionSection>
 
-        {/* Advanced Content */}
+        {/* Map toggle */}
         <button
           type="button"
           onClick={() => setIsMapOpen((s) => !s)}
-          className="w-full rounded-xl border border-border/60 bg-card hover:bg-muted/30 transition-colors px-4 py-3 flex items-center justify-between"
-        >
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4 text-primary" />
-            <div className="text-left">
-              <p className="text-sm font-medium text-foreground">
-                Xəritə ilə seçim
-              </p>
-            </div>
-          </div>
-          {isMapOpen ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          className={cx(
+            "w-full rounded-2xl border bg-background/60 px-4 py-3",
+            "hover:bg-muted/30 transition-colors",
           )}
-        </button>
-        {isMapOpen && (
-          <MapPicker
-            onLocationSelect={onLocationSelect}
-            selectedLocation={selectedLocation}
-          />
-        )}
-        {/* Error */}
-        {error && (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3">
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
-        )}
-
-        {/* Selected */}
-        {selectedLocation && (
-          <div className="rounded-xl border border-primary/20 bg-primary/10 p-4">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-background/60 ring-1 ring-primary/20">
-                <MapPin className="h-5 w-5 text-primary" />
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/30">
+                <MapIcon className="h-4 w-4" />
               </span>
-              <div className="min-w-0">
-                <p className="font-semibold text-foreground leading-snug">
-                  {selectedLocation.address || "Seçilmiş məkan"}
+              <div className="text-left">
+                <p className="text-sm font-semibold text-foreground">
+                  Xəritə ilə seçim
                 </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {selectedLocation.lat.toFixed(6)},{" "}
-                  {selectedLocation.lng.toFixed(6)}
+                <p className="text-xs text-muted-foreground">
+                  Xəritədə pin qoyaraq dəqiqləşdir
                 </p>
               </div>
             </div>
+
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="rounded-full">
+                {isMapOpen ? "Açıq" : "Bağlı"}
+              </Badge>
+              {isMapOpen ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
           </div>
-        )}
+        </button>
+
+        <MotionSection show={isMapOpen}>
+          <div className="rounded-2xl border bg-background/60 ">
+            <MapPicker
+              onLocationSelect={onLocationSelect}
+              selectedLocation={selectedLocation}
+            />
+          </div>
+        </MotionSection>
+
+        {/* Notices / Errors (soft) */}
+        <AnimatePresence initial={false}>
+          {notice && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.18 }}
+              className="rounded-2xl border border-primary/15 bg-primary/5 p-3"
+            >
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 mt-0.5 text-primary" />
+                <p className="text-sm text-foreground">{notice}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence initial={false}>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.18 }}
+              className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3"
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-700 dark:text-amber-300" />
+                <p className="text-sm text-foreground">{error}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </CardContent>
     </Card>
   );

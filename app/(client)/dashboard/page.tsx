@@ -36,13 +36,13 @@ export default function DashboardPage() {
         {/* subtle background */}
         <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-emerald-500/10 via-background to-background" />
 
-        <div className="mx-auto max-w-6xl px-4 md:px-0 py-6 space-y-6">
+        <div className="mx-auto max-w-6xl  md:px-0 py-6 space-y-6">
           {/* Header */}
           <motion.div
             variants={fadeUp}
             initial="hidden"
             animate="show"
-            className="flex flex-col md:flex-row md:items-end md:justify-between gap-3"
+            className="flex flex-col md:flex-row px-4 md:px-0 md:items-end md:justify-between gap-3"
           >
             <div>
               <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
@@ -74,7 +74,7 @@ export default function DashboardPage() {
               className="md:col-span-4"
             >
               {/* AI hero card */}
-              <div className="relative overflow-hidden rounded-2xl border bg-background/60 p-5 backdrop-blur">
+              <div className="relative overflow-hidden md:rounded-2xl border bg-background/60 p-5 backdrop-blur">
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-500/15 via-transparent to-transparent" />
 
                 <div className="relative flex items-start gap-3">

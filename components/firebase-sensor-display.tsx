@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -20,9 +20,13 @@ import {
   RefreshCw,
   Wifi,
   WifiOff,
+  AlertTriangle,
+  ChevronDown,
+  Activity,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { FirebaseSensorData } from "@/lib/types";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface FirebaseSensorDisplayProps {
   firebaseUrl: string; // base url: https://xxx.firebaseio.com
@@ -107,7 +111,6 @@ function parseSensor(raw: any): FirebaseSensorData {
     toNumberOrNull(raw.temperature) ??
     20;
 
-  // səndə “temperature” bir dəyərdir, biz onu həm soil, həm air üçün fallback edirik
   const airTemperature =
     toNumberOrNull(raw.airTemperature) ??
     toNumberOrNull(raw.air_temperature) ??
@@ -163,6 +166,18 @@ function parseSensor(raw: any): FirebaseSensorData {
   };
 }
 
+type ConnState = "connected" | "degraded" | "disconnected";
+
+function msAgo(ts: number) {
+  return Date.now() - ts;
+}
+function fmtAge(ms: number) {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  return `${m} dəq`;
+}
+
 export function FirebaseSensorDisplay({
   firebaseUrl,
   onSensorData,
@@ -177,7 +192,7 @@ export function FirebaseSensorDisplay({
   const [rawPreview, setRawPreview] = useState<any>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // ✅ loop fix: callback-ları ref-də saxla (deps-ə salmırıq)
+  // ✅ loop fix: callback-ları ref-də saxla
   const onSensorDataRef = useRef(onSensorData);
   const onErrorRef = useRef(onError);
 
@@ -189,9 +204,9 @@ export function FirebaseSensorDisplay({
     onErrorRef.current = onError;
   }, [onError]);
 
-  // ✅ flapping olmasın: 3 ardıcıl failure-dan sonra disconnected
+  // ✅ flapping olmasın
   const failCountRef = useRef(0);
-  const [isConnected, setIsConnected] = useState(false);
+  const [conn, setConn] = useState<ConnState>("disconnected");
 
   const query = useQuery({
     queryKey: ["firebase-sensor", base],
@@ -200,43 +215,39 @@ export function FirebaseSensorDisplay({
       const res = await fetch(`${base}/.json?t=${Date.now()}`, {
         cache: "no-store",
       });
-
       if (!res.ok) throw new Error(`Firebase read failed: ${res.status}`);
 
       const json = await res.json().catch(() => null);
       if (!json) throw new Error("Firebase payload boşdur");
 
       const picked = pickSensorObject(json);
-      if (!picked) throw new Error("No compatible sensor object found");
+      if (!picked) throw new Error("Uyğun sensor obyekt tapılmadı");
 
       const reading = parseSensor(picked);
       return { reading, raw: json };
     },
-    refetchInterval: 5000, // istəsən 2000 et
+    refetchInterval: 5000,
     refetchOnWindowFocus: true,
     retry: 1,
     staleTime: 0,
+    gcTime: 1000 * 60 * 5,
+    placeholderData: (prev) => prev, // keep last data while fetching
   });
 
-  // ✅ yalnız “data yenilənəndə” işləsin deyə dataUpdatedAt-dan istifadə edirik
+  // ✅ yalnız “data yenilənəndə” handle et
   const lastHandledAtRef = useRef<number>(0);
 
   useEffect(() => {
     if (!query.data) return;
-
-    // eyni datanı təkrar handle etmə
     if (query.dataUpdatedAt === lastHandledAtRef.current) return;
     lastHandledAtRef.current = query.dataUpdatedAt;
 
-    // success
     failCountRef.current = 0;
-
-    setIsConnected((prev) => (prev ? prev : true)); // yalnız false->true olanda dəyişsin
+    setConn("connected");
     setLastUpdate(new Date());
 
     if (showRaw) setRawPreview(query.data.raw);
 
-    // ref ilə çağırırıq (loop yoxdur)
     onSensorDataRef.current(query.data.reading);
   }, [query.data, query.dataUpdatedAt, showRaw]);
 
@@ -245,9 +256,9 @@ export function FirebaseSensorDisplay({
 
     failCountRef.current += 1;
 
-    if (failCountRef.current >= 3) {
-      setIsConnected((prev) => (prev ? false : prev)); // yalnız true->false
-    }
+    // 1-2 error: degraded, 3+: disconnected
+    if (failCountRef.current >= 3) setConn("disconnected");
+    else setConn((c) => (c === "connected" ? "degraded" : c));
 
     const msg =
       query.error instanceof Error ? query.error.message : "Firebase xətası";
@@ -257,28 +268,110 @@ export function FirebaseSensorDisplay({
 
   const sensorData = query.data?.reading;
 
-  const getStatusColor = (
-    value: number,
-    optimal: { min: number; max: number },
-  ) => {
-    if (value >= optimal.min && value <= optimal.max)
-      return "bg-primary/20 text-primary border-primary/30";
-    if (value < optimal.min - 10 || value > optimal.max + 10)
-      return "bg-destructive/20 text-destructive border-destructive/30";
-    return "bg-accent/20 text-accent-foreground border-accent/30";
-  };
+  const freshness = useMemo(() => {
+    if (!sensorData?.timestamp) return { stale: false, ageMs: 0 };
+    const ageMs = msAgo(sensorData.timestamp);
+    return { stale: ageMs > 60_000, ageMs };
+  }, [sensorData?.timestamp]);
+
+  const statusBadge = useMemo(() => {
+    const baseClass =
+      "h-7 px-3 rounded-full inline-flex items-center gap-1 leading-none shrink-0";
+    if (conn === "connected") {
+      return (
+        <Badge className={baseClass} variant="default">
+          <Wifi className="h-3.5 w-3.5" />
+          Bağlı
+        </Badge>
+      );
+    }
+    if (conn === "degraded") {
+      return (
+        <Badge className={baseClass} variant="secondary">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Zəif əlaqə
+        </Badge>
+      );
+    }
+    return (
+      <Badge className={baseClass} variant="destructive">
+        <WifiOff className="h-3.5 w-3.5" />
+        Kəsildi
+      </Badge>
+    );
+  }, [conn]);
+
+  const freshnessBadge = useMemo(() => {
+    if (!sensorData?.timestamp) return null;
+
+    const cls =
+      "h-7 px-3 rounded-full inline-flex items-center gap-1 leading-none shrink-0";
+    return (
+      <Badge
+        className={cls}
+        variant={freshness.stale ? "secondary" : "outline"}
+        title="Sensor məlumatının yeniliyi"
+      >
+        <Activity className="h-3.5 w-3.5" />
+        {freshness.stale
+          ? `Köhnə • ${fmtAge(freshness.ageMs)}`
+          : `Canlı • ${fmtAge(freshness.ageMs)}`}
+      </Badge>
+    );
+  }, [sensorData?.timestamp, freshness]);
+
+  const valueTone = useCallback(
+    (value: number, optimal: { min: number; max: number }) => {
+      if (value >= optimal.min && value <= optimal.max)
+        return "border-primary/20 bg-primary/5";
+      const far = value < optimal.min - 10 || value > optimal.max + 10;
+      return far
+        ? "border-destructive/20 bg-destructive/5"
+        : "border-amber-500/20 bg-amber-500/10";
+    },
+    [],
+  );
+
+  const StatCard = ({
+    icon,
+    label,
+    value,
+    sub,
+    tone,
+  }: {
+    icon: React.ReactNode;
+    label: string;
+    value: string;
+    sub?: string;
+    tone: string;
+  }) => (
+    <div
+      className={`relative overflow-hidden rounded-2xl border bg-background/50 p-4 ${tone}`}
+    >
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border bg-muted/30">
+          {icon}
+        </span>
+        <span className="font-medium">{label}</span>
+      </div>
+      <div className="mt-2 text-2xl font-semibold tracking-tight">{value}</div>
+      {sub && (
+        <div className="mt-1 text-[11px] text-muted-foreground">{sub}</div>
+      )}
+    </div>
+  );
 
   if (query.isLoading && !sensorData) {
     return (
-      <Card className="border-border/50 shadow-lg">
+      <Card className="border-border/60 bg-background/60 backdrop-blur">
         <CardHeader>
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-6 w-56" />
+          <Skeleton className="h-4 w-40" />
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[...Array(8)].map((_, i) => (
-              <Skeleton key={i} className="h-24" />
+              <Skeleton key={i} className="h-24 rounded-2xl" />
             ))}
           </div>
         </CardContent>
@@ -287,37 +380,36 @@ export function FirebaseSensorDisplay({
   }
 
   return (
-    <Card className="border-border/50 shadow-lg overflow-hidden">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2 text-foreground">
-              <Database className="h-5 w-5 text-primary" />
-              Canlı Sensor Məlumatları
+    <Card className="relative overflow-hidden border-border/60 bg-background/60 backdrop-blur">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-muted/40 via-background to-background" />
+
+      <CardHeader className="relative">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <CardTitle className="flex items-center gap-2">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/40">
+                <Database className="h-4 w-4" />
+              </span>
+              Canlı sensor göstəriciləri
             </CardTitle>
 
-            <CardDescription className="flex items-center gap-2 flex-wrap">
-              Firebase Realtime Database
-              <Badge
-                variant={isConnected ? "default" : "destructive"}
-                className="gap-1"
-              >
-                {isConnected ? (
-                  <Wifi className="h-3 w-3" />
-                ) : (
-                  <WifiOff className="h-3 w-3" />
-                )}
-                {isConnected ? "Bağlı" : "Bağlantı kəsildi"}
-              </Badge>
-              {/* <span className="text-xs text-muted-foreground truncate max-w-[520px]">
-                {base}
-              </span> */}
+            {/* ✅ 2-row description => badges tort kimi yığılmır */}
+            <CardDescription className="space-y-2">
+              <div className="text-muted-foreground">
+                Firebase Realtime Database
+              </div>
+
+              {/* ✅ badges: single-row scroll (premium) */}
+              <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pr-1 no-scrollbar">
+                {statusBadge}
+                {freshnessBadge}
+              </div>
             </CardDescription>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 sm:justify-end">
             {lastUpdate && (
-              <span className="text-xs text-muted-foreground">
+              <span className="hidden sm:block text-xs text-muted-foreground">
                 {lastUpdate.toLocaleTimeString("az-AZ", {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -325,155 +417,154 @@ export function FirebaseSensorDisplay({
               </span>
             )}
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => query.refetch()}
-              disabled={query.isFetching}
-              title="Yenilə"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`}
-              />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-xl"
+                onClick={() => query.refetch()}
+                disabled={query.isFetching}
+                title="Yenilə"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`}
+                />
+              </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowRaw((v) => !v)}
-              className="text-xs"
-              title="Debug (raw JSON)"
-            >
-              {showRaw ? "Debug: ON" : "Debug"}
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl gap-2"
+                onClick={() => setShowRaw((v) => !v)}
+                title="Debug (raw JSON)"
+              >
+                Debug
+                <ChevronDown
+                  className={`h-4 w-4 transition ${showRaw ? "rotate-180" : ""}`}
+                />
+              </Button>
+            </div>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="relative space-y-4">
+        {/* quiet error */}
         {query.isError && (
-          <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
-            <p className="text-sm text-destructive">
-              {query.error instanceof Error
-                ? query.error.message
-                : "Xəta baş verdi"}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              * UI “disconnect” olmur — 3 ardıcıl xətadan sonra kəsilmiş
-              sayılır.
-            </p>
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium">Oxunuşda çətinlik var</div>
+                <div className="text-xs text-muted-foreground break-words">
+                  {query.error instanceof Error
+                    ? query.error.message
+                    : "Xəta baş verdi"}
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-1">
+                  * 3 ardıcıl uğursuz oxunuşdan sonra “kəsildi” kimi
+                  göstəriləcək.
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
         {sensorData && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div
-              className={`p-4 rounded-xl border ${getStatusColor(sensorData.soilMoisture, { min: 40, max: 70 })}`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Droplets className="h-4 w-4" />
-                <span className="text-xs font-medium">Torpaq Nəmliyi</span>
-              </div>
-              <p className="text-2xl font-bold">
-                {sensorData.soilMoisture.toFixed(1)}%
-              </p>
-              <p className="text-xs opacity-70">Optimal: 40–70%</p>
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard
+              icon={<Droplets className="h-4 w-4" />}
+              label="Torpaq nəmliyi"
+              value={`${sensorData.soilMoisture.toFixed(1)}%`}
+              sub="Optimal: 40–70%"
+              tone={valueTone(sensorData.soilMoisture, { min: 40, max: 70 })}
+            />
 
-            <div
-              className={`p-4 rounded-xl border ${getStatusColor(sensorData.soilTemperature, { min: 15, max: 25 })}`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Thermometer className="h-4 w-4" />
-                <span className="text-xs font-medium">Torpaq Temp.</span>
-              </div>
-              <p className="text-2xl font-bold">
-                {sensorData.soilTemperature.toFixed(1)}°C
-              </p>
-              <p className="text-xs opacity-70">Optimal: 15–25°C</p>
-            </div>
+            <StatCard
+              icon={<Thermometer className="h-4 w-4" />}
+              label="Torpaq temp."
+              value={`${sensorData.soilTemperature.toFixed(1)}°C`}
+              sub="Optimal: 15–25°C"
+              tone={valueTone(sensorData.soilTemperature, { min: 15, max: 25 })}
+            />
 
-            <div
-              className={`p-4 rounded-xl border ${getStatusColor(sensorData.airTemperature, { min: 18, max: 30 })}`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Thermometer className="h-4 w-4" />
-                <span className="text-xs font-medium">Hava Temp.</span>
-              </div>
-              <p className="text-2xl font-bold">
-                {sensorData.airTemperature.toFixed(1)}°C
-              </p>
-              <p className="text-xs opacity-70">Optimal: 18–30°C</p>
-            </div>
+            <StatCard
+              icon={<Thermometer className="h-4 w-4" />}
+              label="Hava temp."
+              value={`${sensorData.airTemperature.toFixed(1)}°C`}
+              sub="Optimal: 18–30°C"
+              tone={valueTone(sensorData.airTemperature, { min: 18, max: 30 })}
+            />
 
-            <div
-              className={`p-4 rounded-xl border ${getStatusColor(sensorData.humidity, { min: 50, max: 70 })}`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Wind className="h-4 w-4" />
-                <span className="text-xs font-medium">Hava Rütubəti</span>
-              </div>
-              <p className="text-2xl font-bold">
-                {sensorData.humidity.toFixed(1)}%
-              </p>
-              <p className="text-xs opacity-70">Optimal: 50–70%</p>
-            </div>
+            <StatCard
+              icon={<Wind className="h-4 w-4" />}
+              label="Hava rütubəti"
+              value={`${sensorData.humidity.toFixed(1)}%`}
+              sub="Optimal: 50–70%"
+              tone={valueTone(sensorData.humidity, { min: 50, max: 70 })}
+            />
 
             {sensorData.ph !== undefined && (
-              <div
-                className={`p-4 rounded-xl border ${getStatusColor(sensorData.ph, { min: 6.0, max: 7.0 })}`}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <FlaskConical className="h-4 w-4" />
-                  <span className="text-xs font-medium">pH</span>
-                </div>
-                <p className="text-2xl font-bold">{sensorData.ph.toFixed(1)}</p>
-                <p className="text-xs opacity-70">Optimal: 6.0–7.0</p>
-              </div>
+              <StatCard
+                icon={<FlaskConical className="h-4 w-4" />}
+                label="pH"
+                value={sensorData.ph.toFixed(1)}
+                sub="Optimal: 6.0–7.0"
+                tone={valueTone(sensorData.ph, { min: 6.0, max: 7.0 })}
+              />
             )}
 
             {sensorData.nitrogen !== undefined && (
-              <div className="p-4 rounded-xl border bg-card">
-                <p className="text-xs font-medium text-muted-foreground mb-1">
-                  Azot (N)
-                </p>
-                <p className="text-2xl font-bold text-foreground">
-                  {sensorData.nitrogen} mg/kg
-                </p>
-              </div>
+              <StatCard
+                icon={<span className="text-xs font-semibold">N</span>}
+                label="Azot"
+                value={`${sensorData.nitrogen} mg/kg`}
+                tone="border-border/60 bg-background/50"
+              />
             )}
 
             {sensorData.phosphorus !== undefined && (
-              <div className="p-4 rounded-xl border bg-card">
-                <p className="text-xs font-medium text-muted-foreground mb-1">
-                  Fosfor (P)
-                </p>
-                <p className="text-2xl font-bold text-foreground">
-                  {sensorData.phosphorus} mg/kg
-                </p>
-              </div>
+              <StatCard
+                icon={<span className="text-xs font-semibold">P</span>}
+                label="Fosfor"
+                value={`${sensorData.phosphorus} mg/kg`}
+                tone="border-border/60 bg-background/50"
+              />
             )}
 
             {sensorData.potassium !== undefined && (
-              <div className="p-4 rounded-xl border bg-card">
-                <p className="text-xs font-medium text-muted-foreground mb-1">
-                  Kalium (K)
-                </p>
-                <p className="text-2xl font-bold text-foreground">
-                  {sensorData.potassium} mg/kg
-                </p>
-              </div>
+              <StatCard
+                icon={<span className="text-xs font-semibold">K</span>}
+                label="Kalium"
+                value={`${sensorData.potassium} mg/kg`}
+                tone="border-border/60 bg-background/50"
+              />
             )}
           </div>
         )}
 
-        {showRaw && (
-          <div className="mt-4">
-            <pre className="text-xs p-3 rounded-lg bg-muted/50 border overflow-auto max-h-64">
-              {JSON.stringify(rawPreview, null, 2)}
-            </pre>
-          </div>
-        )}
+        {/* Debug collapsible */}
+        <AnimatePresence initial={false}>
+          {showRaw && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-2xl border bg-muted/20 p-3">
+                <pre className="text-[11px] leading-relaxed overflow-auto max-h-72">
+                  {JSON.stringify(
+                    rawPreview ?? query.data?.raw ?? null,
+                    null,
+                    2,
+                  )}
+                </pre>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </CardContent>
     </Card>
   );
