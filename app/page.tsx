@@ -276,7 +276,7 @@ function Hero() {
   );
 
   return (
-    <section ref={ref} className="relative overflow-hidden pt-28">
+    <section ref={ref} className="relative overflow-hidden pt-28 bg-black">
       <div className="absolute inset-0 bg-grid opacity-40 dark:opacity-55" />
 
       {/* Glow (bir az yüngülləşdirilmiş) */}
