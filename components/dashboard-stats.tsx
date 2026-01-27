@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { motion, Variants } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -21,16 +22,17 @@ import {
   Leaf,
   RefreshCw,
   CalendarDays,
+  Sparkles,
 } from "lucide-react";
 import type { WeatherData, FirebaseSensorData, Crop } from "@/lib/types";
 
 interface DashboardStatsProps {
-  weather?: WeatherData; // currentWeather
-  sensorData?: FirebaseSensorData; // optional
-  forecast?: WeatherData[]; // 7 days
+  weather?: WeatherData;
+  sensorData?: FirebaseSensorData;
+  forecast?: WeatherData[];
   crop?: Crop;
-  dayIndex?: number; // controlled (optional)
-  onDayIndexChange?: (index: number) => void; // controlled (optional)
+  dayIndex?: number;
+  onDayIndexChange?: (index: number) => void;
 }
 
 function clamp(n: number, min: number, max: number) {
@@ -44,6 +46,15 @@ function formatDateLabel(dateStr: string) {
   return `${wd}, ${dm}`;
 }
 
+const fadeUp: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  show: (i = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: "easeOut", delay: i * 0.05 },
+  }),
+};
+
 export function DashboardStats({
   weather,
   sensorData,
@@ -53,8 +64,6 @@ export function DashboardStats({
   onDayIndexChange,
 }: DashboardStatsProps) {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-
-  // uncontrolled fallback
   const [internalIndex, setInternalIndex] = useState(0);
 
   const activeIndex = typeof dayIndex === "number" ? dayIndex : internalIndex;
@@ -69,11 +78,7 @@ export function DashboardStats({
     setLastUpdate(new Date());
   }, [weather, sensorData, forecast, crop, activeIndex]);
 
-  // ✅ selected day (forecast based)
   const day = forecast[activeIndex];
-
-  // ✅ “Current KPI” yalnız bu gün üçün sensor üstün tutulsun,
-  // amma sabah/sonrakılar 100% forecastdan getsin
   const isToday = activeIndex === 0;
 
   const shownTemp = isToday
@@ -94,6 +99,7 @@ export function DashboardStats({
   const shownWind = isToday
     ? (weather?.windSpeed ?? day?.windSpeed ?? 0)
     : (day?.windSpeed ?? 0);
+
   const shownUv = isToday ? (weather?.uvIndex ?? day?.uvIndex) : day?.uvIndex;
 
   const title = useMemo(() => {
@@ -125,8 +131,9 @@ export function DashboardStats({
       tempScore * 0.42 + humScore * 0.33 + soilScore * 0.25,
     );
 
+    // daha “soft” vizual: destructive yalnız çox aşağı olanda
     const variant: "default" | "secondary" | "destructive" =
-      total >= 70 ? "default" : total >= 45 ? "secondary" : "destructive";
+      total >= 72 ? "default" : total >= 50 ? "secondary" : "destructive";
 
     return { total, variant };
   }, [crop, shownTemp, shownHumidity, shownSoil]);
@@ -134,212 +141,263 @@ export function DashboardStats({
   const hasPrev = activeIndex > 0;
   const hasNext = activeIndex < forecast.length - 1;
 
+  const heroTempMax = Math.round(day?.tempMax ?? shownTemp);
+  const heroTempMin = Math.round(day?.tempMin ?? shownTemp);
+
   return (
-    <Card className="border-border/50 shadow-lg overflow-hidden py-12">
-      <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-foreground">
-              <CalendarDays className="h-5 w-5 text-primary" />
-              {title}
-            </CardTitle>
-            <CardDescription className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <RefreshCw className="h-3 w-3" />
-                Yeniləndi: {lastUpdate.toLocaleTimeString("az-AZ")}
-              </span>
+    <motion.div variants={fadeUp} initial="hidden" animate="show">
+      <Card className="relative overflow-hidden border-border/60 bg-background/60 backdrop-blur">
+        {/* subtle background wash */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-muted/40 via-background to-background" />
 
-              {crop && healthBadge && (
-                <Badge variant={healthBadge.variant}>
-                  {crop.nameAz} • Sağlamlıq: {healthBadge.total}%
-                </Badge>
-              )}
-
-              {isToday && sensorData && (
-                <Badge variant="secondary" className="gap-1">
-                  <Leaf className="h-3.5 w-3.5" />
-                  Sensor prioritet
-                </Badge>
-              )}
-            </CardDescription>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              className="rounded-full p-1.5 w-fit h-fit cursor-pointer"
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => setIndex(activeIndex - 1)}
-              disabled={!hasPrev}
-              title="Əvvəlki gün"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-
-            <div className="px-3 py-1.5 rounded-full border border-border bg-muted/30 text-xs text-muted-foreground">
-              {activeIndex + 1}/{forecast.length || 1}
-            </div>
-
-            <Button
-              className="rounded-full p-1.5 w-fit h-fit cursor-pointer"
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => setIndex(activeIndex + 1)}
-              disabled={!hasNext}
-              title="Sonrakı gün"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Hero row */}
-        <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="text-5xl">{day?.icon ?? "⛅"}</div>
-              <div>
-                <p className="text-4xl font-extrabold text-foreground">
-                  {Math.round(day?.tempMax ?? shownTemp)}° /{" "}
-                  {Math.round(day?.tempMin ?? shownTemp)}°
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {day?.description ?? weather?.description ?? "—"}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="flex items-center gap-2">
-                <Thermometer className="h-4 w-4 text-primary" />
-                <span className="text-muted-foreground">
-                  Orta:{" "}
-                  <span className="text-foreground font-semibold">
-                    {Math.round(shownTemp)}°C
-                  </span>
+        <CardHeader className="relative pb-4">
+          <motion.div
+            custom={0}
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+            className="flex flex-wrap items-start justify-between gap-3"
+          >
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/40">
+                  <CalendarDays className="h-4 w-4" />
                 </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Droplets className="h-4 w-4 text-primary" />
-                <span className="text-muted-foreground">
-                  Rütubət:{" "}
-                  <span className="text-foreground font-semibold">
-                    {Math.round(shownHumidity)}%
-                  </span>
+                <span>{title}</span>
+              </CardTitle>
+
+              <CardDescription className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border bg-background/60 px-2.5 py-1 text-xs text-muted-foreground">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  {lastUpdate.toLocaleTimeString("az-AZ")}
                 </span>
+
+                {crop && healthBadge && (
+                  <Badge variant={healthBadge.variant} className="gap-1">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {crop.nameAz} • {healthBadge.total}%
+                  </Badge>
+                )}
+
+                {isToday && sensorData && (
+                  <Badge variant="secondary" className="gap-1">
+                    <Leaf className="h-3.5 w-3.5" />
+                    Sensor əsaslı
+                  </Badge>
+                )}
+              </CardDescription>
+            </div>
+
+            {/* day navigation */}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setIndex(activeIndex - 1)}
+                disabled={!hasPrev}
+                className="rounded-full active:scale-95 transition"
+                title="Əvvəlki gün"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+
+              <div className="px-3 py-1.5 rounded-full border bg-background/60 text-xs text-muted-foreground">
+                {activeIndex + 1}/{forecast.length || 1}
               </div>
-              <div className="flex items-center gap-2">
-                <Wind className="h-4 w-4 text-primary" />
-                <span className="text-muted-foreground">
-                  Külək:{" "}
-                  <span className="text-foreground font-semibold">
-                    {Math.round(shownWind)} km/saat
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setIndex(activeIndex + 1)}
+                disabled={!hasNext}
+                className="rounded-full active:scale-95 transition"
+                title="Sonrakı gün"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </motion.div>
+        </CardHeader>
+
+        <CardContent className="relative space-y-4 pb-6">
+          {/* HERO */}
+          <motion.div
+            custom={1}
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+            className="relative overflow-hidden rounded-2xl border bg-background/60 p-5 md:p-6"
+          >
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent" />
+
+            <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-5xl leading-none select-none">
+                  {day?.icon ?? "⛅"}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-3xl md:text-4xl font-semibold tracking-tight">
+                    {heroTempMax}°{" "}
+                    <span className="text-muted-foreground">/</span>{" "}
+                    {heroTempMin}°
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {day?.description ?? weather?.description ?? "—"}
+                  </p>
+                </div>
+              </div>
+
+              {/* KPIs */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center gap-2 rounded-xl border bg-background/50 px-3 py-2">
+                  <Thermometer className="h-4 w-4" />
+                  <span className="text-muted-foreground">
+                    Orta{" "}
+                    <span className="text-foreground font-semibold">
+                      {Math.round(shownTemp)}°C
+                    </span>
                   </span>
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Sun className="h-4 w-4 text-primary" />
-                <span className="text-muted-foreground">
-                  UV:{" "}
-                  <span className="text-foreground font-semibold">
-                    {typeof shownUv === "number" ? shownUv.toFixed(1) : "N/A"}
+                </div>
+
+                <div className="flex items-center gap-2 rounded-xl border bg-background/50 px-3 py-2">
+                  <Droplets className="h-4 w-4" />
+                  <span className="text-muted-foreground">
+                    Rütubət{" "}
+                    <span className="text-foreground font-semibold">
+                      {Math.round(shownHumidity)}%
+                    </span>
                   </span>
-                </span>
+                </div>
+
+                <div className="flex items-center gap-2 rounded-xl border bg-background/50 px-3 py-2">
+                  <Wind className="h-4 w-4" />
+                  <span className="text-muted-foreground">
+                    Külək{" "}
+                    <span className="text-foreground font-semibold">
+                      {Math.round(shownWind)} km/s
+                    </span>
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 rounded-xl border bg-background/50 px-3 py-2">
+                  <Sun className="h-4 w-4" />
+                  <span className="text-muted-foreground">
+                    UV{" "}
+                    <span className="text-foreground font-semibold">
+                      {typeof shownUv === "number" ? shownUv.toFixed(1) : "—"}
+                    </span>
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          </motion.div>
 
-        {/* Details cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="rounded-2xl border border-border/60 bg-card/40 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Leaf className="h-4 w-4 text-primary" />
-              Torpaq nəmliyi
-            </div>
-            <p className="mt-2 text-3xl font-extrabold text-foreground">
-              {shownSoil ? `${Math.round(shownSoil)}%` : "—"}
-            </p>
-            <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full bg-primary"
-                style={{ width: `${clamp(shownSoil || 0, 0, 100)}%` }}
-              />
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              {isToday && sensorData
-                ? "Sensor datası varsa prioritet odur."
-                : "Hava məlumatından təxmini hesablanır."}
-            </p>
-          </div>
+          {/* DETAILS */}
+          <motion.div
+            custom={2}
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-1 md:grid-cols-3 gap-4"
+          >
+            {/* Soil */}
+            <div className="rounded-2xl border bg-background/60 p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Leaf className="h-4 w-4" />
+                Torpaq nəmliyi
+              </div>
 
-          <div className="rounded-2xl border border-border/60 bg-card/40 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <CloudRain className="h-4 w-4 text-primary" />
-              Yağış
-            </div>
-            <p className="mt-2 text-3xl font-extrabold text-foreground">
-              {typeof day?.precipitation === "number"
-                ? `${Math.round(day.precipitation)} mm`
-                : "—"}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {typeof day?.precipitation === "number" && day.precipitation >= 5
-                ? "Yağış ehtimalı yüksəkdir — suvarmanı azalt."
-                : "Yağış azdır — suvarma planını nəzərdən keçir."}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-border/60 bg-card/40 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Thermometer className="h-4 w-4 text-primary" />
-              Bitki üçün uyğunluq
-            </div>
-
-            {!crop ? (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Bitki seçsən, uyğunluq analizi daha dəqiq olacaq.
+              <p className="mt-2 text-3xl font-semibold tracking-tight">
+                {Number.isFinite(shownSoil) ? `${Math.round(shownSoil)}%` : "—"}
               </p>
-            ) : (
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Temp aralığı</span>
-                  <Badge
-                    variant={
-                      shownTemp < crop.optimalTemp.min ||
-                      shownTemp > crop.optimalTemp.max
-                        ? "destructive"
-                        : "default"
-                    }
-                  >
-                    {crop.optimalTemp.min}–{crop.optimalTemp.max}°C
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Rütubət aralığı</span>
-                  <Badge
-                    variant={
-                      shownHumidity < crop.optimalHumidity.min ||
-                      shownHumidity > crop.optimalHumidity.max
-                        ? "destructive"
-                        : "default"
-                    }
-                  >
-                    {crop.optimalHumidity.min}–{crop.optimalHumidity.max}%
-                  </Badge>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Bu analiz seçilmiş günün göstəricilərinə əsaslanır.
-                </p>
+
+              <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary"
+                  style={{ width: `${clamp(shownSoil || 0, 0, 100)}%` }}
+                />
               </div>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+
+              <p className="mt-2 text-xs text-muted-foreground">
+                {isToday && sensorData
+                  ? "Bu gün sensor varsa göstəricilər daha dəqiqdir."
+                  : "Göstəricilər seçilmiş günün proqnozuna əsaslanır."}
+              </p>
+            </div>
+
+            {/* Rain */}
+            <div className="rounded-2xl border bg-background/60 p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <CloudRain className="h-4 w-4" />
+                Yağış
+              </div>
+
+              <p className="mt-2 text-3xl font-semibold tracking-tight">
+                {typeof day?.precipitation === "number"
+                  ? `${Math.round(day.precipitation)} mm`
+                  : "—"}
+              </p>
+
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                {typeof day?.precipitation === "number" &&
+                day.precipitation >= 5
+                  ? "Yağış ehtimalı var — suvarmanı bir qədər azaltmaq olar."
+                  : "Yağış az görünür — suvarma planını normal saxlayın."}
+              </p>
+            </div>
+
+            {/* Fit */}
+            <div className="rounded-2xl border bg-background/60 p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Thermometer className="h-4 w-4" />
+                Bitki üçün uyğunluq
+              </div>
+
+              {!crop ? (
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                  Bitki seçsən, uyğunluq analizi daha dəqiq olacaq.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Temperatur</span>
+                    <Badge
+                      variant={
+                        shownTemp < crop.optimalTemp.min ||
+                        shownTemp > crop.optimalTemp.max
+                          ? "secondary"
+                          : "default"
+                      }
+                    >
+                      {crop.optimalTemp.min}–{crop.optimalTemp.max}°C
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Rütubət</span>
+                    <Badge
+                      variant={
+                        shownHumidity < crop.optimalHumidity.min ||
+                        shownHumidity > crop.optimalHumidity.max
+                          ? "secondary"
+                          : "default"
+                      }
+                    >
+                      {crop.optimalHumidity.min}–{crop.optimalHumidity.max}%
+                    </Badge>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Analiz seçilmiş günün göstəricilərinə əsaslanır.
+                  </p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }

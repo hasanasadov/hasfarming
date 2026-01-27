@@ -28,6 +28,40 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
+const heroLinks = [
+  {
+    title: "İzahlı addımlar",
+    desc: "Kritik/Orta/Məlumat",
+    href: "/dashboard",
+    icon: <LayoutDashboard className="h-5 w-5" />,
+  },
+  {
+    title: "AI Söhbət",
+    desc: "Sual ver, izah al",
+    href: "/chat",
+    icon: <Bot className="h-5 w-5" />,
+  },
+  {
+    title: "Məkan & Hava",
+    desc: "Proqnoz + torpaq nəmi",
+    href: "/weather",
+    icon: <CloudSun className="h-5 w-5" />,
+  },
+  {
+    title: "Bitkilər",
+    desc: "Temp/su ehtiyacı",
+    href: "/crops",
+    icon: <Sprout className="h-5 w-5" />,
+  },
+
+  {
+    title: "Sensor",
+    desc: "Sensor, profil, reset",
+    href: "/settings",
+    icon: <Settings className="h-5 w-5" />,
+  },
+];
+
 function cx(...c: Array<string | false | null | undefined>) {
   return c.filter(Boolean).join(" ");
 }
@@ -129,7 +163,7 @@ function TopBar() {
     () => [
       {
         href: "/dashboard",
-        label: "Dashboard",
+        label: "İzahlı addımlar",
         icon: <LayoutDashboard className="h-4 w-4" />,
       },
       {
@@ -145,7 +179,7 @@ function TopBar() {
       { href: "/chat", label: "AI Söhbət", icon: <Bot className="h-4 w-4" /> },
       {
         href: "/settings",
-        label: "Settings",
+        label: "Sensor",
         icon: <Settings className="h-4 w-4" />,
       },
     ],
@@ -156,7 +190,7 @@ function TopBar() {
     <div className="fixed inset-x-0 top-0 z-50">
       <Container>
         <div
-          className="mt-4 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 shadow-sm md:backdrop-blur
+          className="mt-4 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 shadow-sm backdrop-blur
                      dark:border-white/10 dark:bg-white/5"
         >
           <Link href="/" className="flex items-center gap-3">
@@ -252,10 +286,13 @@ function Hero() {
       </div>
 
       {/* Video */}
-      <motion.div style={{ y: videoY }} className="absolute inset-0 -z-10">
+      <motion.div
+        style={{ y: videoY }}
+        className="absolute inset-0  bg-red-900"
+      >
         <div
-          className="absolute inset-0 bg-gradient-to-b from-slate-50/10 via-slate-50/55 to-slate-50
-                     dark:from-[#06080F]/20 dark:via-[#06080F]/55 dark:to-[#06080F]"
+          className="absolute inset-0 bg-gradient-to-b 
+                     from-[#06080F]/20 via-[#06080F]/55 to-[#06080F]"
         />
         <video
           ref={videoRef}
@@ -285,9 +322,9 @@ function Hero() {
           </Reveal>
 
           <Reveal delay={0.08} className="mt-5">
-            <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-5xl dark:text-white">
+            <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight  sm:text-5xl text-white">
               Ferma qərarlarını{" "}
-              <span className="text-emerald-700 dark:text-emerald-300">
+              <span className=" text-emerald-300">
                 real vaxt
               </span>{" "}
               optimizasiya et
@@ -295,8 +332,8 @@ function Hero() {
           </Reveal>
 
           <Reveal delay={0.14} className="mt-3">
-            <p className="max-w-2xl text-base text-slate-600 sm:text-lg dark:text-white/70">
-              BEREKET hava, torpaq və bitki kontekstinə görə plan verir:
+            <p className="max-w-2xl text-base  sm:text-lg text-white/70">
+              Bərəkət™ hava, torpaq və bitki kontekstinə görə plan verir:
               temperatur kritikdirsə örtük/parnik, nəmlik düşübsə suvarma planı,
               risk artıbsa prioritet tədbirlər və izahlı səbəb.
             </p>
@@ -310,18 +347,18 @@ function Hero() {
               href="/dashboard"
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
             >
-              Dashboard-a keç <MoveRight className="h-4 w-4" />
+              Panel-ə keç <MoveRight className="h-4 w-4" />
             </Link>
 
             <Link
               href="/weather"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50
-                         dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border  px-5 py-3 text-sm font-semibold  transition 
+                         border-white/10 bg-white/5 text-white hover:bg-white/10"
             >
               Məkanı seç <MapPin className="h-4 w-4 text-emerald-600" />
             </Link>
 
-            <div className="mt-1 flex items-center gap-4 text-xs text-slate-500 dark:text-white/60 sm:mt-0">
+            <div className="mt-1 flex items-center gap-4 text-xs text-white sm:mt-0">
               <span className="inline-flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-emerald-600" /> Şəffaf
                 tövsiyə məntiqi
@@ -334,43 +371,12 @@ function Hero() {
 
           {/* Quick Actions */}
           <Reveal delay={0.28} className="mt-10 grid gap-4 lg:grid-cols-5">
-            {[
-              {
-                title: "Dashboard",
-                desc: "Kritik/Orta/Məlumat",
-                href: "/dashboard",
-                icon: <LayoutDashboard className="h-5 w-5" />,
-              },
-              {
-                title: "Məkan & Hava",
-                desc: "Proqnoz + torpaq nəmi",
-                href: "/weather",
-                icon: <CloudSun className="h-5 w-5" />,
-              },
-              {
-                title: "Bitkilər",
-                desc: "Temp/su ehtiyacı",
-                href: "/crops",
-                icon: <Sprout className="h-5 w-5" />,
-              },
-              {
-                title: "AI Söhbət",
-                desc: "Sual ver, izah al",
-                href: "/chat",
-                icon: <Bot className="h-5 w-5" />,
-              },
-              {
-                title: "Settings",
-                desc: "Sensor, profil, reset",
-                href: "/settings",
-                icon: <Settings className="h-5 w-5" />,
-              },
-            ].map((c) => (
+            {heroLinks.map((c, idx) => (
               <Link
                 key={c.title}
                 href={c.href}
-                className="group rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm transition hover:bg-white md:backdrop-blur
-                           dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                className={`group rounded-3xl border  p-5 shadow-sm transitionmd:backdrop-blur
+                           border-white/10 bg-white/5 hover:bg-white/10 ${idx >= 2 ? "hidden md:block" : ""}`}
               >
                 <div className="flex items-center justify-between">
                   <div
@@ -381,18 +387,17 @@ function Hero() {
                   </div>
                   <MoveRight className="h-4 w-4 text-slate-400 transition group-hover:text-slate-700 dark:text-white/40 dark:group-hover:text-white/80" />
                 </div>
-                <div className="mt-4 text-base font-semibold text-slate-900 dark:text-white">
+                <div className="mt-4 text-base font-semibold text-white">
                   {c.title}
                 </div>
-                <div className="mt-1 text-xs text-slate-600 dark:text-white/65">
+                <div className="mt-1 text-xs text-white/65">
                   {c.desc}
                 </div>
               </Link>
             ))}
           </Reveal>
 
-          {/* KPI row */}
-          <Reveal delay={0.34} className="mt-6 grid gap-4 md:grid-cols-4">
+          {/* <Reveal delay={0.34} className="mt-6 grid gap-4 md:grid-cols-4">
             {[
               {
                 k: "Aktiv sahə",
@@ -441,7 +446,7 @@ function Hero() {
                 </div>
               </div>
             ))}
-          </Reveal>
+          </Reveal> */}
         </motion.div>
       </Container>
 
@@ -464,7 +469,7 @@ function Flow() {
     },
     {
       k: "03",
-      t: "Dashboard tövsiyələri",
+      t: "İzahlı tövsiyələr",
       d: "Kritik/Orta/Məlumat kartları. “Nə etməli?” → prioritet tədbirlər + izah.",
     },
   ];
@@ -493,7 +498,7 @@ function Flow() {
                       {s.k}
                     </div>
                     <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-white/65">
-                      BEREKET flow
+                      Bərəkət flow
                     </div>
                   </div>
                   <div className="mt-3 text-lg font-semibold text-slate-900 dark:text-white">
@@ -540,7 +545,7 @@ function MiniPreview() {
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <Reveal>
             <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-              Dashboard üslubunda preview (dolu görünüş üçün)
+              Panel üslubunda preview (dolu görünüş üçün)
             </h2>
             <p className="mt-2 text-sm text-slate-600 dark:text-white/70">
               Bu hissə sənin screenshot-lardakı kart sistemini “Home”da da hiss
@@ -573,7 +578,7 @@ function MiniPreview() {
                     Tövsiyələr • Bu gün
                   </div>
                   <div className="text-xs text-slate-500 dark:text-white/60">
-                    Pomidor • Globo Tədris • Yeniləndi: 10:30
+                    Pomidor • Bakı • Yeniləndi: 10:30
                   </div>
                 </div>
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-white/70">
@@ -644,7 +649,7 @@ function FAQ() {
         <div className="mt-8 grid gap-4 lg:grid-cols-2">
           {items.map((x, i) => (
             <Reveal key={x.q} delay={0.05 * i}>
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 dark:border-white/10 dark:bg-white/5">
+              <div className="rounded-3xl h-full border border-slate-200 bg-slate-50 p-6 dark:border-white/10 dark:bg-white/5">
                 <div className="text-sm font-semibold text-slate-900 dark:text-white">
                   {x.q}
                 </div>
@@ -672,8 +677,8 @@ function FooterCTA() {
                   İndi davam et
                 </h3>
                 <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-white/70">
-                  Məkanı yenilə, bitkini dəyiş, dashboarddan tədbirləri icra et
-                  və lazım olsa AI ilə soruş.
+                  Məkanı yenilə, bitkini dəyiş, paneldən tədbirləri icra et və
+                  lazım olsa AI ilə soruş.
                 </p>
               </div>
 
@@ -689,7 +694,7 @@ function FooterCTA() {
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50
                              dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
                 >
-                  Bitkilər <Sprout className="h-4 w-4 text-emerald-600" />
+                  Bitki seç <Sprout className="h-4 w-4 text-emerald-600" />
                 </Link>
                 <Link
                   href="/chat"
@@ -704,8 +709,7 @@ function FooterCTA() {
         </Reveal>
 
         <div className="mt-10 text-center text-xs text-slate-500 dark:text-white/55">
-          © {new Date().getFullYear()} BEREKET — Ağıllı Ferma. • /dashboard •
-          /weather • /crops • /chat • /settings
+          © {new Date().getFullYear()} Bərəkət — Ağıllı Ferma.
         </div>
       </Container>
     </section>

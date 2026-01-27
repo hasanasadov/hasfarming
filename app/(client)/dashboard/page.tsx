@@ -1,13 +1,24 @@
 "use client";
 
+import Link from "next/link";
+import { motion, Variants } from "framer-motion";
 import { RouteGuard } from "@/components/route-guard";
 import { ContextPreview } from "@/components/context-preview";
 import { DashboardStats } from "@/components/dashboard-stats";
 import { Recommendations } from "@/components/recommendations";
 import { useAppStore } from "@/lib/store/app-store";
 import RenderIf from "@/lib/renderIf";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { MessageCircle, Sparkles, ArrowRight } from "lucide-react";
+
+const fadeUp: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  show: (i = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: "easeOut", delay: i * 0.06 },
+  }),
+};
 
 export default function DashboardPage() {
   const {
@@ -21,48 +32,111 @@ export default function DashboardPage() {
 
   return (
     <RouteGuard need={["location", "weather", "crop"]}>
-      <div className="md:space-y-6 ">
-        <ContextPreview />
-        <RenderIf condition={!!selectedCrop}>
-          <Recommendations
-            crop={selectedCrop!}
-            weather={currentWeather || undefined}
-            sensorData={sensorData || undefined}
-            forecast={forecast}
-            dayIndex={dayIndex}
-          />
-        </RenderIf>
+      <div className="relative">
+        {/* subtle background */}
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-emerald-500/10 via-background to-background" />
 
-        <div className="flex items-center justify-between gap-4 px-4 md:px-6 py-12 bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-900 dark:to-emerald-900 md:rounded-xl shadow-sm">
-          <div className="flex items-center gap-3">
-            {/* <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 !rounded-full">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4-.8L3 21l1.2-4.2A7.955 7.955 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </div> */}
+        <div className="mx-auto max-w-6xl px-4 md:px-0 py-6 space-y-6">
+          {/* Header */}
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+            className="flex flex-col md:flex-row md:items-end md:justify-between gap-3"
+          >
             <div>
-              <p className="text-sm font-semibold">Sualın var?</p>
-              <p className="text-xs text-muted-foreground">
-                AI ilə dərhal cavab al və tövsiyələr əldə et
+              <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
+                Panel
+              </h1>
+              <p className="text-sm md:text-base text-muted-foreground">
+                Bu gün üçün qısa xülasə və tövsiyələr.
               </p>
             </div>
+          </motion.div>
+
+          {/* Top row: Context + CTA */}
+          <div className="grid gap-4 md:grid-cols-12">
+            <motion.div
+              custom={1}
+              variants={fadeUp}
+              initial="hidden"
+              animate="show"
+              className="md:col-span-8"
+            >
+              <ContextPreview />
+            </motion.div>
+
+            <motion.div
+              custom={2}
+              variants={fadeUp}
+              initial="hidden"
+              animate="show"
+              className="md:col-span-4"
+            >
+              {/* AI hero card */}
+              <div className="relative overflow-hidden rounded-2xl border bg-background/60 p-5 backdrop-blur">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-500/15 via-transparent to-transparent" />
+
+                <div className="relative flex items-start gap-3">
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-muted/40">
+                    <MessageCircle className="h-5 w-5" />
+                  </div>
+
+                  <div className="space-y-1 flex-1">
+                    <p className="text-sm font-semibold">Sürətli sual?</p>
+                    <p className="text-xs text-muted-foreground">
+                      Şəraitə uyğun cavab və tövsiyəni dərhal al.
+                    </p>
+
+                    <div className="pt-3">
+                      <Button asChild className="w-full justify-between">
+                        <Link href="/chat" aria-label="AI ilə danışmağa başla">
+                          AI ilə danış
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
 
-          <Link href="/chat" aria-label="AI ilə danışmağa başla">
-            <Button className="bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transform transition duration-150 px-4 py-2 rounded-md shadow-md">
-              AI ilə danışmağa başla
-            </Button>
-          </Link>
-        </div>
+          {/* Recommendations */}
+          <RenderIf condition={!!selectedCrop}>
+            <motion.div
+              custom={3}
+              variants={fadeUp}
+              initial="hidden"
+              animate="show"
+            >
+              <Recommendations
+                crop={selectedCrop!}
+                weather={currentWeather || undefined}
+                sensorData={sensorData || undefined}
+                forecast={forecast}
+                dayIndex={dayIndex}
+              />
+            </motion.div>
+          </RenderIf>
 
-        <DashboardStats
-          weather={currentWeather || undefined}
-          sensorData={sensorData || undefined}
-          forecast={forecast}
-          crop={selectedCrop || undefined}
-          dayIndex={dayIndex}
-          onDayIndexChange={setDayIndex}
-        />
+          {/* Stats */}
+          <motion.div
+            custom={4}
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+          >
+            <DashboardStats
+              weather={currentWeather || undefined}
+              sensorData={sensorData || undefined}
+              forecast={forecast}
+              crop={selectedCrop || undefined}
+              dayIndex={dayIndex}
+              onDayIndexChange={setDayIndex}
+            />
+          </motion.div>
+        </div>
       </div>
     </RouteGuard>
   );

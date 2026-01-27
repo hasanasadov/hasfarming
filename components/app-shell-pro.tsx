@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -24,118 +26,200 @@ import {
   Menu,
   MapPin,
   Leaf,
-  PiIcon,
+  Database,
+  RotateCcw,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
-const NAV = [
-  { href: "/dashboard", label: "Nə etməli", icon: LayoutDashboard },
-  { href: "/weather", label: "Məkan və Hava", icon: Cloud },
-  { href: "/crops", label: "Bitkilər", icon: Sprout },
-  { href: "/chat", label: "AI Söhbət", icon: Bot },
-  { href: "/settings", label: "Sensorum var", icon: Settings }, // ✅ NEW
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { TopbarContext } from "./topbar-context";
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  match?: "exact" | "prefix";
+};
+
+const NAV: NavItem[] = [
+  {
+    href: "/dashboard",
+    label: "Nə etməli",
+    icon: LayoutDashboard,
+    match: "exact",
+  },
+  { href: "/weather", label: "Məkan və Hava", icon: Cloud, match: "prefix" },
+  { href: "/crops", label: "Bitkilər", icon: Sprout, match: "prefix" },
+  { href: "/chat", label: "AI Söhbət", icon: Bot, match: "prefix" },
+  { href: "/settings", label: "Sensorum var", icon: Settings, match: "prefix" },
 ];
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
-  const pathname = usePathname();
-  const { location, selectedCrop, dataSource } = useAppStore();
+function isActivePath(pathname: string, href: string, match: NavItem["match"]) {
+  if (match === "prefix")
+    return pathname === href || pathname.startsWith(`${href}/`);
+  return pathname === href;
+}
 
-  const status = useMemo(() => {
-    const loc = location?.address?.split(",")[0];
-    const crop = selectedCrop?.nameAz;
-    const src = dataSource === "firebase" ? "Sensor" : "Weather";
-    return { loc, crop, src };
-  }, [location, selectedCrop, dataSource]);
-
+function Brand({ collapsed }: { collapsed: boolean }) {
   return (
-    <div className="flex flex-col gap-2">
-      {/* brand */}
-      <Link
-        href="/"
-        onClick={onNavigate}
-        className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-muted transition"
-      >
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
-          <Leaf className="h-6 w-6 text-primary" />
-        </span>
+    <Link
+      href="/"
+      className={[
+        "group flex items-center gap-3 rounded-2xl px-3 py-2 transition",
+        "hover:bg-muted/60",
+      ].join(" ")}
+      aria-label="Ana səhifə"
+    >
+      <span className="inline-flex h-10 w-10 p-2 items-center justify-center rounded-2xl border bg-primary/10">
+        <Leaf className="h-5 w-5 text-primary" />
+      </span>
+
+      {!collapsed && (
         <div className="min-w-0">
           <div className="font-semibold leading-tight">Bərəkət</div>
-          <div className="text-xs text-muted-foreground -mt-0.5">
-            Ağıllı Ferma
+          <div className="text-xs text-muted-foreground -mt-0.5 whitespace-nowrap">
+            Ağıllı ferma köməkçisi
           </div>
         </div>
-      </Link>
+      )}
+    </Link>
+  );
+}
 
-      {/* status pills */}
-      <div className="px-3 pb-2">
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary" className="gap-1">
-            <MapPin className="h-3 w-3" />
-            {status.loc ?? "Məkan yoxdur"}
-          </Badge>
-          <Badge variant="secondary">
-            {status.crop ? ` ${status.crop}` : "Bitki yoxdur"}
-          </Badge>
-          <Badge variant="secondary">{status.src}</Badge>
-        </div>
-      </div>
+function NavLinks({
+  collapsed,
+  onNavigate,
+}: {
+  collapsed: boolean;
+  onNavigate?: () => void;
+}) {
+  const pathname = usePathname();
 
-      {/* nav */}
-      <div className="px-2 space-y-1">
-        {NAV.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              className={[
-                "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
-                active
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted",
-              ].join(" ")}
-            >
-              <Icon className="h-4 w-4" />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+  return (
+    <TooltipProvider delayDuration={150}>
+      <div className="flex flex-col gap-2">
+        <Brand collapsed={collapsed} />
+
+        <nav className="px-2 space-y-1" aria-label="Əsas naviqasiya">
+          {NAV.map((item) => {
+            const Icon = item.icon;
+            const active = isActivePath(pathname, item.href, item.match);
+
+            const linkEl = (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={[
+                  "group flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
+                  "focus:outline-none focus:ring-2 focus:ring-primary/30",
+                  active
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                  collapsed ? "justify-center" : "",
+                ].join(" ")}
+              >
+                <span
+                  className={[
+                    "inline-flex h-9 w-9  p-2 items-center justify-center rounded-xl border transition",
+                    active
+                      ? "border-primary-foreground/20 bg-primary-foreground/10"
+                      : "border-transparent bg-transparent group-hover:border-border/60 group-hover:bg-background/40",
+                  ].join(" ")}
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
+
+                {!collapsed && <span className="flex-1 whitespace-nowrap">{item.label}</span>}
+
+                {!collapsed && active && (
+                  <span className="text-[10px] rounded-full bg-primary-foreground/15 px-2 py-0.5">
+                    aktiv
+                  </span>
+                )}
+              </Link>
+            );
+
+            // collapsed mode => tooltip with label
+            if (!collapsed) return linkEl;
+
+            return (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
+                <TooltipContent side="right" className="text-xs">
+                  {item.label}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </nav>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
 
 export function AppShellPro({ children }: { children: React.ReactNode }) {
   const { reset } = useAppStore();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  const onReset = useCallback(() => {
+    const ok = window.confirm("Tətbiqi yenidən başlatmaq istəyirsiniz?");
+    if (ok) reset();
+  }, [reset]);
+
+  const asideWidth = collapsed ? 88 : 288;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Desktop layout */}
-      <div className="hidden md:grid md:grid-cols-[280px_1fr]">
-        <aside className="sticky top-0 h-screen border-r bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40">
+      <div className="hidden md:flex">
+        <motion.aside
+          animate={{ width: asideWidth }}
+          transition={{ type: "spring", stiffness: 260, damping: 26 }}
+          className="sticky top-0 h-screen border-r bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40 overflow-hidden"
+        >
           <div className="p-3">
-            <NavLinks />
+            <NavLinks collapsed={collapsed} />
           </div>
-        </aside>
+        </motion.aside>
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           {/* topbar */}
           <header className="sticky top-0 z-40 border-b bg-card/70 backdrop-blur supports-[backdrop-filter]:bg-card/40">
-            <div className="h-14 px-4 flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Nə etməli tətbiqi - Ağıllı Ferma idarəetməsi - Aİ dəstəyi
+            <div className="h-14 px-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setCollapsed((v) => !v)}
+                  aria-label={collapsed ? "Paneli aç" : "Paneli yığ"}
+                  title={collapsed ? "Paneli aç" : "Paneli yığ"}
+                >
+                  {collapsed ? (
+                    <PanelLeftOpen className="h-4 w-4" />
+                  ) : (
+                    <PanelLeftClose className="h-4 w-4" />
+                  )}
+                </Button>
+
+                <TopbarContext />
               </div>
+
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    confirm(
-                      "Tətbiqi yenidən başlatmaq istədiyinizə əminsiniz?",
-                    ) && reset();
-                  }}
+                  onClick={onReset}
+                  className="gap-2 rounded-xl"
                 >
+                  <RotateCcw className="h-4 w-4" />
                   Reset
                 </Button>
                 <ThemeToggle />
@@ -147,66 +231,63 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      {/* Mobile layout */}
+      {/* Mobile */}
       <div className="md:hidden">
         <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-          <div className="h-14 px-4 flex items-center justify-between">
+          <div className="h-14 px-4 flex items-center justify-between gap-2">
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger asChild>
-                <Button size="icon" variant="outline">
+                <Button size="icon" variant="outline" className="rounded-xl">
                   <Menu className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
+
               <SheetContent side="left" className="p-0 w-80">
                 <VisuallyHidden>
-                  <SheetTitle>Navigation Menu</SheetTitle>
+                  <SheetTitle>Naviqasiya</SheetTitle>
                 </VisuallyHidden>
 
                 <div className="p-3 flex flex-col h-full justify-between">
-                  <NavLinks onNavigate={() => setOpen(false)} />
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      confirm(
-                        "Tətbiqi yenidən başlatmaq istədiyinizə əminsiniz?",
-                      ) && reset();
-                      setOpen(false);
-                    }}
-                  >
-                    Yenidən başlat
-                  </Button>
+                  <NavLinks
+                    collapsed={false}
+                    onNavigate={() => setOpen(false)}
+                  />
+
+                  <div className="p-2">
+                    <Button
+                      variant="outline"
+                      className="w-full rounded-xl gap-2"
+                      onClick={() => {
+                        onReset();
+                        setOpen(false);
+                      }}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Yenidən başlat
+                    </Button>
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>
 
-            <Link href="/" className="font-semibold">
-              <Button
-                className="inline-flex items-center gap-2"
-                variant="ghost"
-              >
+            <Link href="/" className="min-w-0" aria-label="Ana səhifə">
+              <Button variant="ghost" className="gap-2 rounded-xl px-2">
                 <Leaf className="h-5 w-5 text-primary" />
-                Bərəkət
+                <span className="font-semibold truncate">Bərəkət</span>
               </Button>
             </Link>
 
-            {/* <Link href="/">
-              <Button variant="outline" size="sm">
-                Nə etməli ?
-              </Button>
-            </Link> */}
-            <Link href="/chat">
-              <Button variant="outline" size="sm">
-                AI Söhbət
+            <Link href="/chat" aria-label="AI Söhbət">
+              <Button variant="outline" size="sm" className="rounded-xl">
+                AI
               </Button>
             </Link>
 
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-            </div>
+            <ThemeToggle />
           </div>
         </header>
 
-        <main className="">{children}</main>
+        <main>{children}</main>
       </div>
     </div>
   );
