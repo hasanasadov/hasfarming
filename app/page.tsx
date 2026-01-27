@@ -288,7 +288,7 @@ function Hero() {
       {/* Video */}
       <motion.div
         style={{ y: videoY }}
-        className="absolute inset-0  bg-red-900"
+        className="absolute inset-0 "
       >
         <div
           className="absolute inset-0 bg-gradient-to-b 
@@ -305,7 +305,7 @@ function Hero() {
           poster="/hero-poster.jpg"
           disablePictureInPicture
         >
-          <source src="/hero.mp4" type="video/mp4" />
+          <source src="https://f9r6p9yyly.ufs.sh/f/xMaCRSVimNM8Li3pbjYHTB6wW9OhPJQznud4CcY8RZDoALEU" type="video/mp4" />
         </video>
       </motion.div>
 
