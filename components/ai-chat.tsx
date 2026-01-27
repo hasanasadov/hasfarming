@@ -24,7 +24,6 @@ import {
   ChevronUp,
   MessageSquareText,
   X,
-  Trash2,
 } from "lucide-react";
 
 import type {
@@ -404,7 +403,6 @@ export function AIChat({
 
   return (
     <div className="w-full flex flex-col min-h-[72svh] md:min-h-[78vh]">
-      {/* THREADS DRAWER */}
       {showThreads && (
         <div className="fixed inset-0 z-[60]">
           <button
@@ -483,7 +481,6 @@ export function AIChat({
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteThread(t.meta.threadKey);
-                              
                             }}
                             title="Sil"
                           >
@@ -506,7 +503,7 @@ export function AIChat({
 
       {/* Top bar */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b">
-        <div className="mx-auto px-3 md:px-6 py-3 flex items-center justify-between gap-3">
+        <div className="mx-auto px-6 md:px-0 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Bot
               className={cn(
@@ -554,7 +551,7 @@ export function AIChat({
 
         {/* Prompts row */}
         {!connectionError && !isChecking && (
-          <div className="mx-auto px-3 md:px-6 pb-3">
+          <div className="mx-auto px-6 md:px-0 pb-3">
             <div className="flex md:hidden items-center justify-between">
               <button
                 type="button"
@@ -637,7 +634,7 @@ export function AIChat({
           </div>
         ) : (
           <ScrollArea className="h-full" ref={scrollWrapRef}>
-            <div className="mx-auto px-3 md:px-6 py-6 space-y-6">
+            <div className="mx-auto px-6 md:px-0 py-6 space-y-6">
               {messages.map((m) => (
                 <div
                   key={m.id}
@@ -705,7 +702,7 @@ export function AIChat({
 
       {/* Composer */}
       <div className="sticky bottom-0 z-10 bg-background/90 backdrop-blur border-t">
-        <div className="mx-auto px-3 md:px-6 py-3">
+        <div className="mx-auto px-6 md:px-0 py-3">
           <div className="rounded-2xl border border-border bg-background shadow-sm px-2 py-2 flex items-end gap-2">
             <Textarea
               ref={textareaRef}
