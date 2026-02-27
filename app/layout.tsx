@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import { AppShellPro } from "@/components/app-shell-pro";
 import { SensorListener } from "@/components/sensor-listener";
 import QueryProvider from "@/providers/query-provider";
+import { LanguageProvider } from "@/lib/i18n";
 
 const _inter = Inter({ subsets: ["latin"] });
 
@@ -61,7 +62,9 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem={false}
         >
-          <QueryProvider>{children}</QueryProvider>
+          <LanguageProvider>
+            <QueryProvider>{children}</QueryProvider>
+          </LanguageProvider>
         </ThemeProvider>
         <Analytics />
       </body>

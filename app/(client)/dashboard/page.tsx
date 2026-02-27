@@ -10,6 +10,7 @@ import { useAppStore } from "@/lib/store/app-store";
 import RenderIf from "@/lib/renderIf";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Sparkles, ArrowRight } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 10 },
@@ -29,6 +30,7 @@ export default function DashboardPage() {
     dayIndex,
     setDayIndex,
   } = useAppStore();
+  const { t } = useTranslation();
 
   return (
     <RouteGuard need={["location", "weather", "crop"]}>
@@ -46,10 +48,10 @@ export default function DashboardPage() {
           >
             <div>
               <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-                Panel
+                {t("dashboard.title")}
               </h1>
               <p className="text-sm md:text-base text-muted-foreground">
-                Bu gün üçün qısa xülasə və tövsiyələr.
+                {t("dashboard.subtitle")}
               </p>
             </div>
           </motion.div>
@@ -83,15 +85,15 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="space-y-1 flex-1">
-                    <p className="text-sm font-semibold">Sürətli sual?</p>
+                    <p className="text-sm font-semibold">{t("dashboard.quickQuestion")}</p>
                     <p className="text-xs text-muted-foreground">
-                      Şəraitə uyğun cavab və tövsiyəni dərhal al.
+                      {t("dashboard.quickQuestionDesc")}
                     </p>
 
                     <div className="pt-3">
                       <Button asChild className="w-full justify-between">
-                        <Link href="/chat" aria-label="AI ilə danışmağa başla">
-                          AI ilə danış
+                        <Link href="/chat" aria-label={t("dashboard.chatWithAiLabel")}>
+                          {t("dashboard.chatWithAi")}
                           <ArrowRight className="h-4 w-4" />
                         </Link>
                       </Button>

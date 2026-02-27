@@ -27,40 +27,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-
-const heroLinks = [
-  {
-    title: "İzahlı addımlar",
-    desc: "Kritik/Orta/Məlumat",
-    href: "/dashboard",
-    icon: <LayoutDashboard className="h-5 w-5" />,
-  },
-  {
-    title: "AI Söhbət",
-    desc: "Sual ver, izah al",
-    href: "/chat",
-    icon: <Bot className="h-5 w-5" />,
-  },
-  {
-    title: "Məkan & Hava",
-    desc: "Proqnoz + torpaq nəmi",
-    href: "/weather",
-    icon: <CloudSun className="h-5 w-5" />,
-  },
-  {
-    title: "Bitkilər",
-    desc: "Temp/su ehtiyacı",
-    href: "/crops",
-    icon: <Sprout className="h-5 w-5" />,
-  },
-
-  {
-    title: "Sensor",
-    desc: "Sensor, profil, reset",
-    href: "/settings",
-    icon: <Settings className="h-5 w-5" />,
-  },
-];
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useTranslation } from "@/lib/i18n";
 
 function cx(...c: Array<string | false | null | undefined>) {
   return c.filter(Boolean).join(" ");
@@ -159,31 +127,33 @@ function Reveal({
 }
 
 function TopBar() {
+  const { t } = useTranslation();
+
   const nav = useMemo(
     () => [
       {
         href: "/dashboard",
-        label: "İzahlı addımlar",
+        label: t("nav.dashboard"),
         icon: <LayoutDashboard className="h-4 w-4" />,
       },
       {
         href: "/weather",
-        label: "Məkan & Hava",
+        label: t("nav.weather"),
         icon: <CloudSun className="h-4 w-4" />,
       },
       {
         href: "/crops",
-        label: "Bitkilər",
+        label: t("nav.crops"),
         icon: <Sprout className="h-4 w-4" />,
       },
-      { href: "/chat", label: "AI Söhbət", icon: <Bot className="h-4 w-4" /> },
+      { href: "/chat", label: t("nav.chat"), icon: <Bot className="h-4 w-4" /> },
       {
         href: "/settings",
-        label: "Sensor",
+        label: t("nav.settings"),
         icon: <Settings className="h-4 w-4" />,
       },
     ],
-    [],
+    [t],
   );
 
   return (
@@ -199,10 +169,10 @@ function TopBar() {
             </span>
             <div className="leading-tight">
               <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                Bərəkət
+                {t("common.appName")}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-white/60">
-                Ağıllı Ferma
+                {t("common.subtitle")}
               </div>
             </div>
           </Link>
@@ -222,13 +192,14 @@ function TopBar() {
           </div>
 
           <div className="flex items-center gap-2">
+            <LanguageSwitcher />
             <ThemeToggle />
             <Link
               href="/dashboard"
               className="hidden rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50
                          dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 md:inline-flex"
             >
-              Keç: Dashboard <MoveRight className="ml-2 h-4 w-4" />
+              {t("nav.dashboard")} <MoveRight className="ml-2 h-4 w-4" />
             </Link>
           </div>
         </div>
@@ -238,6 +209,7 @@ function TopBar() {
 }
 
 function Hero() {
+  const { t } = useTranslation();
   const reduce = useReducedMotion();
   const ref = useRef<HTMLElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -317,25 +289,23 @@ function Hero() {
                          dark:border-white/10 dark:bg-white/5 dark:text-white/70"
             >
               <Sparkles className="h-4 w-4 text-emerald-600" />
-              Məkan seç → Bitki seç → “Nə etməli?” tövsiyələri → AI izah
+              {t("landing.hero.badge")}
             </div>
           </Reveal>
 
           <Reveal delay={0.08} className="mt-5">
             <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight  sm:text-5xl text-white">
-              Ferma qərarlarını{" "}
+              {t("landing.hero.title1")}{" "}
               <span className=" text-emerald-300">
-                real vaxt
+                {t("landing.hero.title2")}
               </span>{" "}
-              optimizasiya et
+              {t("landing.hero.title3")}
             </h1>
           </Reveal>
 
           <Reveal delay={0.14} className="mt-3">
             <p className="max-w-2xl text-base  sm:text-lg text-white/70">
-              Bərəkət™ hava, torpaq və bitki kontekstinə görə plan verir:
-              temperatur kritikdirsə örtük/parnik, nəmlik düşübsə suvarma planı,
-              risk artıbsa prioritet tədbirlər və izahlı səbəb.
+              {t("landing.hero.subtitle")}
             </p>
           </Reveal>
 
@@ -347,7 +317,7 @@ function Hero() {
               href="/dashboard"
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
             >
-              Panel-ə keç <MoveRight className="h-4 w-4" />
+              {t("landing.hero.cta")} <MoveRight className="h-4 w-4" />
             </Link>
 
             <Link
@@ -355,25 +325,30 @@ function Hero() {
               className="inline-flex items-center justify-center gap-2 rounded-2xl border  px-5 py-3 text-sm font-semibold  transition 
                          border-white/10 bg-white/5 text-white hover:bg-white/10"
             >
-              Məkanı seç <MapPin className="h-4 w-4 text-emerald-600" />
+              {t("landing.hero.ctaSecondary")} <MapPin className="h-4 w-4 text-emerald-600" />
             </Link>
 
             <div className="mt-1 flex items-center gap-4 text-xs text-white sm:mt-0">
               <span className="inline-flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" /> Şəffaf
-                tövsiyə məntiqi
+                <ShieldCheck className="h-4 w-4 text-emerald-600" /> {t("landing.hero.stat1")}
               </span>
               <span className="inline-flex items-center gap-2">
-                <Bot className="h-4 w-4 text-emerald-600" /> AI ilə “niyə?”
+                <Bot className="h-4 w-4 text-emerald-600" /> {t("landing.hero.stat3")}
               </span>
             </div>
           </Reveal>
 
           {/* Quick Actions */}
           <Reveal delay={0.28} className="mt-10 grid gap-4 lg:grid-cols-5">
-            {heroLinks.map((c, idx) => (
+            {[
+              { href: "/dashboard", title: t("nav.dashboard"), desc: t("landing.hero.stat1"), icon: <LayoutDashboard className="h-5 w-5" /> },
+              { href: "/chat", title: t("nav.chat"), desc: t("landing.hero.stat3"), icon: <Bot className="h-5 w-5" /> },
+              { href: "/weather", title: t("nav.weather"), desc: t("landing.hero.stat2"), icon: <CloudSun className="h-5 w-5" /> },
+              { href: "/crops", title: t("nav.crops"), desc: t("context.crop"), icon: <Sprout className="h-5 w-5" /> },
+              { href: "/settings", title: t("nav.settings"), desc: t("topbar.sensor"), icon: <Settings className="h-5 w-5" /> },
+            ].map((c, idx) => (
               <Link
-                key={c.title}
+                key={c.href}
                 href={c.href}
                 className={`group rounded-3xl border  p-5 shadow-sm transitionmd:backdrop-blur
                            border-white/10 bg-white/5 hover:bg-white/10 ${idx >= 2 ? "hidden md:block" : ""}`}
@@ -456,21 +431,23 @@ function Hero() {
 }
 
 function Flow() {
+  const { t } = useTranslation();
+
   const steps = [
     {
       k: "01",
-      t: "Məkan seçimi",
-      d: "Canlı məkan, ünvan/koordinat və ya xəritə ilə seçim. Sistem region risk profilini çıxarır.",
+      t: t("landing.flow.step1.title"),
+      d: t("landing.flow.step1.desc"),
     },
     {
       k: "02",
-      t: "Bitki seçimi",
-      d: "Optimal temperatur aralığı, su ehtiyacı, yetişmə günləri. Axtarış tolerantdır (1–2 hərf səhv).",
+      t: t("landing.flow.step2.title"),
+      d: t("landing.flow.step2.desc"),
     },
     {
       k: "03",
-      t: "İzahlı tövsiyələr",
-      d: "Kritik/Orta/Məlumat kartları. “Nə etməli?” → prioritet tədbirlər + izah.",
+      t: t("landing.flow.step3.title"),
+      d: t("landing.flow.step3.desc"),
     },
   ];
 
@@ -479,11 +456,10 @@ function Flow() {
       <Container>
         <Reveal>
           <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-            Axın — sənin məhsul məntiqinə 1:1 uyğun
+            {t("landing.flow.title")}
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-white/70">
-            Home səhifə “nə edirsən” sualını 10 saniyədə cavablamalıdır: seç,
-            gör, icra et, soruş.
+            {t("landing.flow.subtitle")}
           </p>
         </Reveal>
 
@@ -518,6 +494,8 @@ function Flow() {
 }
 
 function MiniPreview() {
+  const { t } = useTranslation();
+
   const cards = [
     {
       title: "Temperatur aşağıdır",
@@ -545,12 +523,10 @@ function MiniPreview() {
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <Reveal>
             <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-              Panel üslubunda preview (dolu görünüş üçün)
+              {t("landing.preview.title")}
             </h2>
             <p className="mt-2 text-sm text-slate-600 dark:text-white/70">
-              Bu hissə sənin screenshot-lardakı kart sistemini “Home”da da hiss
-              etdirir: kritik siqnal, orta plan, ümumi info. (Marketing üçün
-              artıq ola bilər, amma “premium” effekti verir.)
+              {t("landing.preview.subtitle")}
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -558,14 +534,14 @@ function MiniPreview() {
                 href="/dashboard"
                 className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
               >
-                Tövsiyələrə bax <MoveRight className="h-4 w-4" />
+                {t("nav.dashboard")} <MoveRight className="h-4 w-4" />
               </Link>
               <Link
                 href="/chat"
                 className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50
                            dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
               >
-                AI ilə soruş <Bot className="h-4 w-4 text-emerald-600" />
+                {t("nav.chat")} <Bot className="h-4 w-4 text-emerald-600" />
               </Link>
             </div>
           </Reveal>
@@ -614,23 +590,13 @@ function MiniPreview() {
 }
 
 function FAQ() {
+  const { t } = useTranslation();
+
   const items = [
-    {
-      q: "“Nə etməli?” tövsiyələri nəyə əsaslanır?",
-      a: "Hava (temp/yağıntı/külək), torpaq nəmi və seçilmiş bitkinin optimal ehtiyacları üzərindən risk + prioritet modeli qurulur.",
-    },
-    {
-      q: "AI Söhbət nə edir?",
-      a: "Tövsiyəni izah edir, alternativlər verir, “niyə belədir?” sualına kontekstə uyğun cavablar çıxarır.",
-    },
-    {
-      q: "Məkan dəyişəndə nə baş verir?",
-      a: "Proqnoz və parametrlər yenilənir, tövsiyələr avtomatik re-prioritet olunur.",
-    },
-    {
-      q: "Sensorum var bölməsi necə istifadə olunur?",
-      a: "Sensor varsa, torpaq nəmi və sahə göstəriciləri daha stabil olur; yoxdursa, proqnoz əsaslı təxmini model işləyir.",
-    },
+    { q: t("landing.faq.q1"), a: t("landing.faq.a1") },
+    { q: t("landing.faq.q2"), a: t("landing.faq.a2") },
+    { q: t("landing.faq.q3"), a: t("landing.faq.a3") },
+    { q: t("landing.faq.q4"), a: t("landing.faq.a4") },
   ];
 
   return (
@@ -638,11 +604,10 @@ function FAQ() {
       <Container>
         <Reveal>
           <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-            FAQ
+            {t("landing.faq.title")}
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-white/70">
-            Bu blok da “dolu” görünüş verir və məhsulun məntiqini qısa şəkildə
-            izah edir.
+            {t("landing.hero.subtitle")}
           </p>
         </Reveal>
 
@@ -666,6 +631,8 @@ function FAQ() {
 }
 
 function FooterCTA() {
+  const { t } = useTranslation();
+
   return (
     <section className="bg-slate-50 py-16 dark:bg-[#06080F]">
       <Container>
@@ -674,11 +641,10 @@ function FooterCTA() {
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h3 className="text-2xl font-semibold text-slate-900 dark:text-white">
-                  İndi davam et
+                  {t("landing.footerCta.title")}
                 </h3>
                 <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-white/70">
-                  Məkanı yenilə, bitkini dəyiş, paneldən tədbirləri icra et və
-                  lazım olsa AI ilə soruş.
+                  {t("landing.footerCta.subtitle")}
                 </p>
               </div>
 
@@ -687,21 +653,21 @@ function FooterCTA() {
                   href="/weather"
                   className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
                 >
-                  Məkanı seç <MapPin className="h-4 w-4" />
+                  {t("nextStep.selectLocationAction")} <MapPin className="h-4 w-4" />
                 </Link>
                 <Link
                   href="/crops"
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50
                              dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
                 >
-                  Bitki seç <Sprout className="h-4 w-4 text-emerald-600" />
+                  {t("nextStep.selectCropAction")} <Sprout className="h-4 w-4 text-emerald-600" />
                 </Link>
                 <Link
                   href="/chat"
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50
                              dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
                 >
-                  AI Söhbət <Bot className="h-4 w-4 text-emerald-600" />
+                  {t("nav.chat")} <Bot className="h-4 w-4 text-emerald-600" />
                 </Link>
               </div>
             </div>
@@ -709,7 +675,7 @@ function FooterCTA() {
         </Reveal>
 
         <div className="mt-10 text-center text-xs text-slate-500 dark:text-white/55">
-          © {new Date().getFullYear()} Bərəkət — Ağıllı Ferma.
+          © {new Date().getFullYear()} {t("landing.footer.copy")}
         </div>
       </Container>
     </section>

@@ -12,10 +12,12 @@ import {
   ThermometerSun,
   ChevronDown,
 } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export function ContextPreview() {
   const { location, selectedCrop, dayIndex, forecast, dataSource, sensorData } =
     useAppStore();
+  const { t } = useTranslation();
 
   const [open, setOpen] = useState(false);
 

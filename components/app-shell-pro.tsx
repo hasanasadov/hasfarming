@@ -39,10 +39,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { TopbarContext } from "./topbar-context";
+import { LanguageSwitcher } from "./language-switcher";
+import { useTranslation } from "@/lib/i18n";
+import type { TranslationKey } from "@/lib/i18n";
 
 type NavItem = {
   href: string;
-  label: string;
+  labelKey: TranslationKey;
   icon: React.ComponentType<{ className?: string }>;
   match?: "exact" | "prefix";
 };
@@ -50,14 +53,14 @@ type NavItem = {
 const NAV: NavItem[] = [
   {
     href: "/dashboard",
-    label: "Nə etməli",
+    labelKey: "nav.dashboard",
     icon: LayoutDashboard,
     match: "exact",
   },
-  { href: "/weather", label: "Məkan və Hava", icon: Cloud, match: "prefix" },
-  { href: "/crops", label: "Bitkilər", icon: Sprout, match: "prefix" },
-  { href: "/chat", label: "AI Söhbət", icon: Bot, match: "prefix" },
-  { href: "/settings", label: "Sensorum var", icon: Settings, match: "prefix" },
+  { href: "/weather", labelKey: "nav.weather", icon: Cloud, match: "prefix" },
+  { href: "/crops", labelKey: "nav.crops", icon: Sprout, match: "prefix" },
+  { href: "/chat", labelKey: "nav.chat", icon: Bot, match: "prefix" },
+  { href: "/settings", labelKey: "nav.settings", icon: Settings, match: "prefix" },
 ];
 
 function isActivePath(pathname: string, href: string, match: NavItem["match"]) {
@@ -67,6 +70,7 @@ function isActivePath(pathname: string, href: string, match: NavItem["match"]) {
 }
 
 function Brand({ collapsed }: { collapsed: boolean }) {
+  const { t } = useTranslation();
   return (
     <Link
       href="/"
@@ -74,7 +78,7 @@ function Brand({ collapsed }: { collapsed: boolean }) {
         "group flex items-center gap-3 rounded-2xl px-3 py-2 transition",
         "hover:bg-muted/60",
       ].join(" ")}
-      aria-label="Ana səhifə"
+      aria-label={t("common.homePage")}
     >
       <span className="inline-flex h-10 w-10 p-2 items-center justify-center rounded-2xl border bg-primary/10">
         <Leaf className="h-5 w-5 text-primary" />
@@ -82,9 +86,9 @@ function Brand({ collapsed }: { collapsed: boolean }) {
 
       {!collapsed && (
         <div className="min-w-0">
-          <div className="font-semibold leading-tight">Bərəkət</div>
+          <div className="font-semibold leading-tight">{t("common.appName")}</div>
           <div className="text-xs text-muted-foreground -mt-0.5 whitespace-nowrap">
-            Ağıllı ferma köməkçisi
+            {t("common.subtitle")}
           </div>
         </div>
       )}
@@ -100,16 +104,18 @@ function NavLinks({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const { t } = useTranslation();
 
   return (
     <TooltipProvider delayDuration={150}>
       <div className="flex flex-col gap-2">
         <Brand collapsed={collapsed} />
 
-        <nav className="px-2 space-y-1" aria-label="Əsas naviqasiya">
+        <nav className="px-2 space-y-1" aria-label={t("nav.mainNav")}>
           {NAV.map((item) => {
             const Icon = item.icon;
             const active = isActivePath(pathname, item.href, item.match);
+            const label = t(item.labelKey);
 
             const linkEl = (
               <Link
@@ -137,11 +143,11 @@ function NavLinks({
                   <Icon className="h-4 w-4" />
                 </span>
 
-                {!collapsed && <span className="flex-1 whitespace-nowrap">{item.label}</span>}
+                {!collapsed && <span className="flex-1 whitespace-nowrap">{label}</span>}
 
                 {!collapsed && active && (
                   <span className="text-[10px] rounded-full bg-primary-foreground/15 px-2 py-0.5">
-                    aktiv
+                    {t("common.active")}
                   </span>
                 )}
               </Link>
@@ -154,7 +160,7 @@ function NavLinks({
               <Tooltip key={item.href}>
                 <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
                 <TooltipContent side="right" className="text-xs">
-                  {item.label}
+                  {label}
                 </TooltipContent>
               </Tooltip>
             );
@@ -167,13 +173,14 @@ function NavLinks({
 
 export function AppShellPro({ children }: { children: React.ReactNode }) {
   const { reset } = useAppStore();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   const onReset = useCallback(() => {
-    const ok = window.confirm("Tətbiqi yenidən başlatmaq istəyirsiniz?");
+    const ok = window.confirm(t("common.restartConfirm"));
     if (ok) reset();
-  }, [reset]);
+  }, [reset, t]);
 
   const asideWidth = collapsed ? 88 : 288;
 
@@ -200,8 +207,8 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
                   variant="outline"
                   className="rounded-xl"
                   onClick={() => setCollapsed((v) => !v)}
-                  aria-label={collapsed ? "Paneli aç" : "Paneli yığ"}
-                  title={collapsed ? "Paneli aç" : "Paneli yığ"}
+                  aria-label={collapsed ? t("nav.panelOpen") : t("nav.panelClose")}
+                  title={collapsed ? t("nav.panelOpen") : t("nav.panelClose")}
                 >
                   {collapsed ? (
                     <PanelLeftOpen className="h-4 w-4" />
@@ -220,8 +227,9 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
                   className="gap-2 rounded-xl"
                 >
                   <RotateCcw className="h-4 w-4" />
-                  Yenidən başlat
+                  {t("common.restart")}
                 </Button>
+                <LanguageSwitcher />
                 <ThemeToggle />
               </div>
             </div>
@@ -244,7 +252,7 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
 
               <SheetContent side="left" className="p-0 w-80">
                 <VisuallyHidden>
-                  <SheetTitle>Naviqasiya</SheetTitle>
+                  <SheetTitle>{t("nav.navigation")}</SheetTitle>
                 </VisuallyHidden>
 
                 <div className="p-3 flex flex-col h-full justify-between">
@@ -263,27 +271,24 @@ export function AppShellPro({ children }: { children: React.ReactNode }) {
                       }}
                     >
                       <RotateCcw className="h-4 w-4" />
-                      Yenidən başlat
+                      {t("common.restart")}
                     </Button>
                   </div>
                 </div>
               </SheetContent>
             </Sheet>
 
-            <Link href="/" className="min-w-0" aria-label="Ana səhifə">
+            <Link href="/" className="min-w-0" aria-label={t("common.homePage")}>
               <Button variant="ghost" className="gap-2 rounded-xl px-2">
                 <Leaf className="h-5 w-5 text-primary" />
-                <span className="font-semibold truncate">Bərəkət</span>
+                <span className="font-semibold truncate">{t("common.appName")}</span>
               </Button>
             </Link>
 
-            {/* <Link href="/chat" aria-label="AI Söhbət">
-              <Button variant="outline" size="sm" className="rounded-xl">
-                AI
-              </Button>
-            </Link> */}
-
-            <ThemeToggle />
+            <div className="flex items-center gap-1.5">
+              <LanguageSwitcher />
+              <ThemeToggle />
+            </div>
           </div>
         </header>
 
