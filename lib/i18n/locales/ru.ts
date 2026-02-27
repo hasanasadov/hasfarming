@@ -198,6 +198,21 @@ export const ru: Record<TranslationKey, string> = {
 
   // Footer
   "landing.footer.copy": "Bərəkət — Умная Платформа для Фермеров",
+  "footer.brand": "Bərəkət",
+  "footer.brandSub": "Smart Farming Platform",
+  "footer.brandDesc": "Повышайте продуктивность с помощью умных сельскохозяйственных решений. Данные в реальном времени, AI-рекомендации и точные прогнозы.",
+  "footer.features": "Возможности",
+  "footer.feat1": "Прогноз погоды на 7 дней",
+  "footer.feat2": "Интеграция датчиков Firebase",
+  "footer.feat3": "AI-рекомендации",
+  "footer.feat4": "GPS-отслеживание",
+  "footer.stats": "Статистика",
+  "footer.cropTypes": "Типы культур",
+  "footer.dailyForecast": "Дневной прогноз",
+  "footer.liveMonitoring": "Live мониторинг",
+  "footer.smartAdvice": "Умные советы",
+  "footer.copyright": "2026 Bərəkət. Все права защищены.",
+  "footer.systemActive": "Система активна",
 
   // Settings Page
   "settings.dataSource": "Источник данных",

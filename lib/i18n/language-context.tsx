@@ -73,6 +73,14 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     [locale],
   );
 
+  if (!mounted) {
+    return (
+      <LanguageContext.Provider value={{ locale: "az", setLocale, t }}>
+        <div suppressHydrationWarning>{children}</div>
+      </LanguageContext.Provider>
+    );
+  }
+
   return (
     <LanguageContext.Provider value={{ locale, setLocale, t }}>
       {children}
