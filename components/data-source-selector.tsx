@@ -21,6 +21,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import type { DataSource } from "@/lib/types";
+import { useTranslation } from "@/lib/i18n";
 
 interface DataSourceSelectorProps {
   onSourceSelect: (source: DataSource, firebaseUrl?: string) => void;
@@ -39,6 +40,7 @@ export function DataSourceSelector({
   onSourceSelect,
   selectedSource,
 }: DataSourceSelectorProps) {
+  const { t } = useTranslation();
   const [firebaseUrl, setFirebaseUrl] = useState("");
   const normalizedUrl = useMemo(
     () => normalizeFirebaseUrl(firebaseUrl),
@@ -53,7 +55,7 @@ export function DataSourceSelector({
 
   const validateFirebaseUrl = async () => {
     if (!normalizedUrl) {
-      setValidationError("Firebase URL daxil edin");
+      setValidationError(t("ds.firebaseUrlEmpty"));
       setIsFirebaseValid(false);
       return;
     }
@@ -75,12 +77,12 @@ export function DataSourceSelector({
         setValidationError(null);
       } else {
         setIsFirebaseValid(false);
-        setValidationError(data?.error || "Firebase yoxlanıla bilmədi");
+        setValidationError(data?.error || t("ds.firebaseValidateFailed"));
       }
     } catch (e) {
       console.error("validateFirebaseUrl error:", e);
       setIsFirebaseValid(false);
-      setValidationError("Yoxlama zamanı xəta baş verdi (network).");
+      setValidationError(t("ds.firebaseValidateError"));
     } finally {
       setIsValidating(false);
     }
@@ -100,11 +102,10 @@ export function DataSourceSelector({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-foreground">
           <Database className="h-5 w-5 text-primary" />
-          Data Mənbəyi Seçimi
+          {t("ds.title")}
         </CardTitle>
         <CardDescription>
-          Default olaraq hava məlumatları ilə işləyir. İstəsəniz sensorlar üçün
-          Firebase qoşa bilərsiniz.
+          {t("ds.desc")}
         </CardDescription>
       </CardHeader>
 
@@ -118,29 +119,28 @@ export function DataSourceSelector({
 
             <div className="flex-1">
               <h3 className="font-semibold text-foreground">
-                Hava API-si (Tövsiyə olunur)
+                {t("ds.weatherTitle")}
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Seçilmiş məkana görə hava məlumatlarını alırıq və torpaq
-                şəraitini təxmin edirik. Heç bir əlavə quraşdırma yoxdur.
+                {t("ds.weatherDesc")}
               </p>
 
               <div className="flex flex-wrap gap-2 mt-3">
                 <span className="px-2 py-1 rounded-full bg-secondary text-secondary-foreground text-xs">
-                  Pulsuz
+                  {t("ds.free")}
                 </span>
                 <span className="px-2 py-1 rounded-full bg-secondary text-secondary-foreground text-xs">
-                  Ani
+                  {t("ds.instant")}
                 </span>
                 <span className="px-2 py-1 rounded-full bg-secondary text-secondary-foreground text-xs">
-                  7 günlük proqnoz
+                  {t("ds.forecast7")}
                 </span>
               </div>
 
               <div className="mt-4">
                 <Button onClick={proceedWeather} className="gap-2">
                   <CheckCircle2 className="h-4 w-4" />
-                  Davam et (Hava API)
+                  {t("ds.continueWeather")}
                 </Button>
               </div>
             </div>
@@ -164,10 +164,10 @@ export function DataSourceSelector({
               </div>
               <div className="text-left">
                 <p className="font-semibold text-foreground">
-                  Firebase Sensorları (Optional)
+                  {t("ds.firebaseTitle")}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  IoT sensor datası varsa qoş, yoxdursa heç lazım deyil.
+                  {t("ds.firebaseDesc")}
                 </p>
               </div>
             </div>
@@ -181,7 +181,7 @@ export function DataSourceSelector({
             <div className="p-4 border-t border-border space-y-3">
               <div className="space-y-2">
                 <Label htmlFor="firebase-url" className="text-foreground">
-                  Firebase Database URL
+                  {t("ds.firebaseUrlLabel")}
                 </Label>
 
                 <div className="flex gap-2">
@@ -205,7 +205,7 @@ export function DataSourceSelector({
                     {isValidating ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      "Yoxla"
+                      t("ds.validate")
                     )}
                   </Button>
                 </div>
@@ -230,7 +230,7 @@ export function DataSourceSelector({
               {isFirebaseValid && (
                 <div className="flex items-center gap-2 text-primary text-sm">
                   <CheckCircle2 className="h-4 w-4" />
-                  Firebase bağlantısı uğurlu!
+                  {t("ds.firebaseOk")}
                 </div>
               )}
 
@@ -239,13 +239,12 @@ export function DataSourceSelector({
                 disabled={!isFirebaseValid}
                 className="w-full"
               >
-                Davam et (Firebase)
+                {t("ds.continueFirebase")}
               </Button>
 
               <div className="p-3 rounded-lg bg-muted/50 border border-border">
                 <p className="text-xs text-muted-foreground">
-                  <strong>Qeyd:</strong> Sensor datası aşağıdakı formatda ola
-                  bilər:{" "}
+                  <strong>{t("ds.firebaseNote")}</strong>{" "}
                   <code className="px-1 py-0.5 rounded bg-muted text-foreground">
                     {
                       "{ soilMoisture, soilTemperature, airTemperature, humidity, ph, nitrogen, phosphorus, potassium }"

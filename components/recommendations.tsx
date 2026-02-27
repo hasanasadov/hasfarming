@@ -25,6 +25,7 @@ import type {
   FirebaseSensorData,
   Recommendation,
 } from "@/lib/types";
+import { useTranslation } from "@/lib/i18n";
 
 interface RecommendationsProps {
   crop: Crop;
@@ -56,6 +57,7 @@ export function Recommendations({
   forecast = [],
   dayIndex = 0,
 }: RecommendationsProps) {
+  const { t } = useTranslation();
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -83,74 +85,60 @@ export function Recommendations({
     const ph = isToday ? sensorData?.ph : undefined;
 
     // Temperature
+    const dayLabel = dayIndex === 0 ? t("rec.todayLabel") : t("rec.selectedDayLabel");
     if (temp < crop.optimalTemp.min) {
       const diff = crop.optimalTemp.min - temp;
       recs.push({
         type: "warning",
-        title: "Temperatur aşağıdır",
-        description: `${dayIndex === 0 ? "Bu gün" : "Seçilmiş gün"} temperatur (${temp.toFixed(
-          1,
-        )}°C) ${crop.nameAz} üçün optimal aralıqdan ${diff.toFixed(
-          1,
-        )}°C aşağıdır. Örtük/istixana tədbiri planlaya bilərsiniz.`,
+        title: t("rec.tempLow"),
+        description: `${dayLabel} ${t("rec.tempLowDesc").replace("{{temp}}", temp.toFixed(1)).replace("{{crop}}", crop.nameAz).replace("{{diff}}", diff.toFixed(1))}`,
         priority: diff > 5 ? "critical" : "high",
       });
     } else if (temp > crop.optimalTemp.max) {
       const diff = temp - crop.optimalTemp.max;
       recs.push({
         type: "warning",
-        title: "Temperatur yüksəkdir",
-        description: `${dayIndex === 0 ? "Bu gün" : "Seçilmiş gün"} temperatur (${temp.toFixed(
-          1,
-        )}°C) ${crop.nameAz} üçün optimal aralıqdan ${diff.toFixed(
-          1,
-        )}°C yuxarıdır. Kölgə + suvarma intervalını optimallaşdırın.`,
+        title: t("rec.tempHigh"),
+        description: `${dayLabel} ${t("rec.tempHighDesc").replace("{{temp}}", temp.toFixed(1)).replace("{{crop}}", crop.nameAz).replace("{{diff}}", diff.toFixed(1))}`,
         priority: diff > 5 ? "critical" : "high",
       });
     } else {
       recs.push({
         type: "info",
-        title: "Temperatur uyğundur",
-        description: `Temperatur (${temp.toFixed(1)}°C) ${crop.nameAz} üçün yaxşı aralıqdadır.`,
+        title: t("rec.tempOk"),
+        description: t("rec.tempOkDesc").replace("{{temp}}", temp.toFixed(1)).replace("{{crop}}", crop.nameAz),
         priority: "low",
       });
     }
 
     // Soil moisture
     if (soilMoisture < 30) {
+      const hint = crop.waterNeeds === "high" ? t("rec.irrigationCriticalHintHigh") : t("rec.irrigationCriticalHintNormal");
       recs.push({
         type: "irrigation",
-        title: "Suvarmanı prioritetləşdirək",
-        description: `Torpaq nəmliyi aşağıdır (${soilMoisture.toFixed(
-          0,
-        )}%). ${crop.waterNeeds === "high" ? "Bu bitki daha çox su istəyir — yaxın vaxtda suvarma yaxşı olar." : "Yüngül suvarma faydalı olar."}`,
+        title: t("rec.irrigationCritical"),
+        description: t("rec.irrigationCriticalDesc").replace("{{moisture}}", soilMoisture.toFixed(0)).replace("{{hint}}", hint),
         priority: "critical",
       });
     } else if (soilMoisture < 45) {
       recs.push({
         type: "irrigation",
-        title: "Suvarma planı",
-        description: `Torpaq nəmliyi (${soilMoisture.toFixed(
-          0,
-        )}%) orta səviyyədədir. 24–48 saat üçün suvarma planı qurun.`,
+        title: t("rec.irrigationPlan"),
+        description: t("rec.irrigationPlanDesc").replace("{{moisture}}", soilMoisture.toFixed(0)),
         priority: "medium",
       });
     } else if (soilMoisture > 80) {
       recs.push({
         type: "warning",
-        title: "Nəmlik yüksəkdir",
-        description: `Torpaq nəmliyi yüksəktir (${soilMoisture.toFixed(
-          0,
-        )}%). Drenajı yoxlayın, suvarmanı azaltmaq məsləhətdir.`,
+        title: t("rec.moistureHigh"),
+        description: t("rec.moistureHighDesc").replace("{{moisture}}", soilMoisture.toFixed(0)),
         priority: "high",
       });
     } else {
       recs.push({
         type: "info",
-        title: "Torpaq nəmliyi balansdadır",
-        description: `Torpaq nəmliyi (${soilMoisture.toFixed(
-          0,
-        )}%) normal aralıqdadır.`,
+        title: t("rec.moistureOk"),
+        description: t("rec.moistureOkDesc").replace("{{moisture}}", soilMoisture.toFixed(0)),
         priority: "low",
       });
     }
@@ -159,10 +147,8 @@ export function Recommendations({
     if (precipitation >= 5) {
       recs.push({
         type: "info",
-        title: "Yağış gözlənilir",
-        description: `Seçilmiş gün üçün yağış təxminən ${Math.round(
-          precipitation,
-        )} mm ola bilər. Suvarmanı bir qədər azaltmaq olar.`,
+        title: t("rec.rainExpected"),
+        description: t("rec.rainExpectedDesc").replace("{{rain}}", Math.round(precipitation).toString()),
         priority: "low",
       });
     }
@@ -172,19 +158,15 @@ export function Recommendations({
       if (ph < crop.optimalPh.min) {
         recs.push({
           type: "fertilizer",
-          title: "pH aşağıdır",
-          description: `pH (${ph.toFixed(
-            1,
-          )}) optimal aralıqdan aşağıdır (${crop.optimalPh.min}-${crop.optimalPh.max}). pH-ı qaldırmaq üçün uyğun əlavələr düşünün.`,
+          title: t("rec.phLow"),
+          description: t("rec.phLowDesc").replace("{{ph}}", ph.toFixed(1)).replace("{{min}}", crop.optimalPh.min.toString()).replace("{{max}}", crop.optimalPh.max.toString()),
           priority: "medium",
         });
       } else if (ph > crop.optimalPh.max) {
         recs.push({
           type: "fertilizer",
-          title: "pH yüksəkdir",
-          description: `pH (${ph.toFixed(
-            1,
-          )}) optimal aralıqdan yuxarıdır. Torpağı balanslamaq üçün uyğun gübrə strategiyası seçin.`,
+          title: t("rec.phHigh"),
+          description: t("rec.phHighDesc").replace("{{ph}}", ph.toFixed(1)),
           priority: "medium",
         });
       }
@@ -198,9 +180,8 @@ export function Recommendations({
     ) {
       recs.push({
         type: "fertilizer",
-        title: "Azot dəstəyi",
-        description:
-          "Azot səviyyəsi aşağıdır. Uyğun azot gübrəsi ilə dəstək vermək olar.",
+        title: t("rec.nitrogenSupport"),
+        description: t("rec.nitrogenDesc"),
         priority: "medium",
       });
     }
@@ -211,9 +192,8 @@ export function Recommendations({
     ) {
       recs.push({
         type: "fertilizer",
-        title: "Fosfor dəstəyi",
-        description:
-          "Fosfor səviyyəsi aşağıdır. Uyğun fosfor gübrəsi planlaya bilərsiniz.",
+        title: t("rec.phosphorusSupport"),
+        description: t("rec.phosphorusDesc"),
         priority: "medium",
       });
     }
@@ -224,9 +204,8 @@ export function Recommendations({
     ) {
       recs.push({
         type: "fertilizer",
-        title: "Kalium dəstəyi",
-        description:
-          "Kalium səviyyəsi aşağıdır. Uyğun kalium gübrəsi ilə balanslamaq olar.",
+        title: t("rec.potassiumSupport"),
+        description: t("rec.potassiumDesc"),
         priority: "medium",
       });
     }
@@ -234,8 +213,8 @@ export function Recommendations({
     // General tip
     recs.push({
       type: "info",
-      title: "Rutin nəzarət",
-      description: `${crop.nameAz} üçün yetişmə müddəti təxminən ${crop.growthDays} gündür. Zərərverici müşahidəsini rutin saxlayın.`,
+      title: t("rec.routineCheck"),
+      description: t("rec.routineCheckDesc").replace("{{crop}}", crop.nameAz).replace("{{days}}", crop.growthDays.toString()),
       priority: "low",
     });
 
@@ -247,10 +226,10 @@ export function Recommendations({
 
   const dayTitle =
     dayIndex === 0
-      ? "Bu gün"
+      ? t("common.today")
       : day
         ? new Date(day.date).toLocaleDateString("az-AZ", { weekday: "long" })
-        : "Seçilmiş gün";
+        : t("common.selectedDay");
 
   const counts = {
     critical: recommendations.filter((r) => r.priority === "critical").length,
@@ -278,7 +257,7 @@ export function Recommendations({
         return {
           wrap: "border-destructive/20 bg-destructive/5",
           bar: "bg-destructive/60",
-          badge: <Badge variant="destructive">Prioritet</Badge>,
+          badge: <Badge variant="destructive">{t("rec.priorityBadge")}</Badge>,
         };
       case "high":
         return {
@@ -286,7 +265,7 @@ export function Recommendations({
           bar: "bg-amber-500/60",
           badge: (
             <Badge className="bg-amber-500/80 hover:bg-amber-500/80">
-              Yüksək
+              {t("rec.highBadge")}
             </Badge>
           ),
         };
@@ -294,23 +273,23 @@ export function Recommendations({
         return {
           wrap: "border-primary/20 bg-primary/5",
           bar: "bg-primary/60",
-          badge: <Badge variant="secondary">Orta</Badge>,
+          badge: <Badge variant="secondary">{t("rec.mediumBadge")}</Badge>,
         };
       default:
         return {
           wrap: "border-border/60 bg-background/60",
           bar: "bg-muted-foreground/30",
-          badge: <Badge variant="outline">Məlumat</Badge>,
+          badge: <Badge variant="outline">{t("rec.infoBadge")}</Badge>,
         };
     }
   };
 
   const summaryText =
     counts.critical > 0
-      ? "Bir neçə prioritet addım var — əvvəl onları həll edək."
+      ? t("rec.summaryTextCritical")
       : counts.high > 0
-        ? "Diqqətə dəyər məqamlar var — kiçik optimallaşdırmalar kömək edər."
-        : "Şərait stabil görünür — rutin nəzarət kifayətdir.";
+        ? t("rec.summaryTextHigh")
+        : t("rec.summaryTextStable");
 
   return (
     <motion.div variants={wrap} initial="hidden" animate="show">
@@ -325,12 +304,12 @@ export function Recommendations({
                   <Sparkles className="h-4 w-4" />
                 </span>
                 <span>
-                  Tövsiyələr{" "}
+                  {t("rec.title")}{" "}
                   <span className="text-muted-foreground">• {dayTitle}</span>
                 </span>
               </CardTitle>
               <CardDescription>
-                {crop.nameAz} üçün seçilmiş günün şəraitinə görə yığcam plan
+                {crop.nameAz} {t("rec.subtitle")}
               </CardDescription>
             </div>
 
@@ -343,15 +322,15 @@ export function Recommendations({
           {/* calm counters */}
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {counts.critical > 0 && (
-              <Badge variant="destructive">{counts.critical} prioritet</Badge>
+              <Badge variant="destructive">{counts.critical} {t("rec.priorityCount")}</Badge>
             )}
             {counts.high > 0 && (
               <Badge className="bg-amber-500/80 hover:bg-amber-500/80">
-                {counts.high} yüksək
+                {counts.high} {t("rec.highCount")}
               </Badge>
             )}
             {counts.medium > 0 && (
-              <Badge variant="secondary">{counts.medium} orta</Badge>
+              <Badge variant="secondary">{counts.medium} {t("rec.mediumCount")}</Badge>
             )}
           </div>
         </CardHeader>
@@ -406,7 +385,7 @@ export function Recommendations({
           <div className="mt-4 rounded-2xl border bg-muted/30 p-4">
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle2 className="h-4 w-4" />
-              <h3 className="font-semibold">Xülasə</h3>
+              <h3 className="font-semibold">{t("rec.summary")}</h3>
             </div>
             <p className="text-sm text-muted-foreground">{summaryText}</p>
           </div>

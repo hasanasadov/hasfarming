@@ -4,16 +4,18 @@ import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useAppStore } from "@/lib/store/app-store";
 import { MapPin, Sprout, Database } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export function TopbarContext() {
   const { location, selectedCrop, dataSource } = useAppStore();
+  const { t } = useTranslation();
 
   const ctx = useMemo(() => {
-    const loc = location?.address?.split(",")[0] ?? "Məkan seçilməyib";
-    const crop = selectedCrop?.nameAz ?? "Bitki seçilməyib";
-    const src = dataSource === "firebase" ? "Sensor" : "Proqnoz";
+    const loc = location?.address?.split(",")[0] ?? t("topbar.noLocation");
+    const crop = selectedCrop?.nameAz ?? t("topbar.noCrop");
+    const src = dataSource === "firebase" ? t("topbar.sensor") : t("topbar.forecast");
     return { loc, crop, src };
-  }, [location, selectedCrop, dataSource]);
+  }, [location, selectedCrop, dataSource, t]);
 
   return (
     <div className="flex items-center gap-2 min-w-0">

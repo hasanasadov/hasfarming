@@ -1,3 +1,5 @@
+"use client";
+
 import {
   BarChart3,
   Bot,
@@ -7,8 +9,11 @@ import {
   MapPin,
   Sprout,
 } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 const Footer = () => {
+  const { t } = useTranslation();
+
   return (
     <footer className="relative mt-12 overflow-hidden">
       {/* Gradient Background */}
@@ -26,16 +31,15 @@ const Footer = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg text-foreground">
-                    Bərəkət
+                    {t("footer.brand")}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Smart Farming Platform
+                    {t("footer.brandSub")}
                   </p>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Ağıllı kənd təsərrüfatı həlləri ilə məhsuldarlığınızı artırın.
-                Real-time data, AI tövsiyələri və dəqiq proqnozlar.
+                {t("footer.brandDesc")}
               </p>
             </div>
 
@@ -43,24 +47,24 @@ const Footer = () => {
             <div className="space-y-4">
               <h4 className="font-semibold text-foreground flex items-center gap-2">
                 <Sprout className="h-4 w-4 text-primary" />
-                Xüsusiyyətlər
+                {t("footer.features")}
               </h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-center gap-2">
-                  <Cloud className="h-4 w-4 text-primary/70" />7 günlük hava
-                  proqnozu
+                  <Cloud className="h-4 w-4 text-primary/70" />
+                  {t("footer.feat1")}
                 </li>
                 <li className="flex items-center gap-2">
                   <Database className="h-4 w-4 text-primary/70" />
-                  Firebase sensor inteqrasiyası
+                  {t("footer.feat2")}
                 </li>
                 <li className="flex items-center gap-2">
                   <Bot className="h-4 w-4 text-primary/70" />
-                  AI-powered tövsiyələr
+                  {t("footer.feat3")}
                 </li>
                 <li className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-primary/70" />
-                  GPS məkan izləmə
+                  {t("footer.feat4")}
                 </li>
               </ul>
             </div>
@@ -69,29 +73,29 @@ const Footer = () => {
             <div className="space-y-4">
               <h4 className="font-semibold text-foreground flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-primary" />
-                Statistika
+                {t("footer.stats")}
               </h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-lg bg-card border border-border/50">
                   <p className="text-2xl font-bold text-primary">12+</p>
-                  <p className="text-xs text-muted-foreground">Bitki növü</p>
+                  <p className="text-xs text-muted-foreground">{t("footer.cropTypes")}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-card border border-border/50">
                   <p className="text-2xl font-bold text-primary">7</p>
                   <p className="text-xs text-muted-foreground">
-                    Günlük proqnoz
+                    {t("footer.dailyForecast")}
                   </p>
                 </div>
                 <div className="p-3 rounded-lg bg-card border border-border/50">
                   <p className="text-2xl font-bold text-primary">24/7</p>
                   <p className="text-xs text-muted-foreground">
-                    Live monitoring
+                    {t("footer.liveMonitoring")}
                   </p>
                 </div>
                 <div className="p-3 rounded-lg bg-card border border-border/50">
                   <p className="text-2xl font-bold text-primary">AI</p>
                   <p className="text-xs text-muted-foreground">
-                    Ağıllı məsləhətlər
+                    {t("footer.smartAdvice")}
                   </p>
                 </div>
               </div>
@@ -101,12 +105,12 @@ const Footer = () => {
           {/* Bottom Bar */}
           <div className="mt-8 pt-6 border-t border-border/50 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              2026 Bərəkət. Bütün hüquqlar qorunur.
+              {t("footer.copyright")}
             </p>
             <div className="flex items-center gap-4">
               <span className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                Sistem aktiv
+                {t("footer.systemActive")}
               </span>
               <span className="text-xs text-muted-foreground">v1.0.0</span>
             </div>

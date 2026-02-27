@@ -7,11 +7,12 @@ import { ThemeProvider } from "next-themes";
 import { AppShellPro } from "@/components/app-shell-pro";
 import { SensorListener } from "@/components/sensor-listener";
 import QueryProvider from "@/providers/query-provider";
+import { LanguageProvider } from "@/lib/i18n";
 
 const _inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Bərəkət - Smart Farming Platform",
+  title: "Prospera - Smart Farming Platform",
   description:
     "Smart farming platform with live weather data, soil analysis, and personalized crop recommendations",
   generator: "asadov.site",
@@ -55,13 +56,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`font-sans antialiased`}>
+      <body className={`font-sans antialiased`} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem={false}
         >
-          <QueryProvider>{children}</QueryProvider>
+          <LanguageProvider>
+            <QueryProvider>{children}</QueryProvider>
+          </LanguageProvider>
         </ThemeProvider>
         <Analytics />
       </body>

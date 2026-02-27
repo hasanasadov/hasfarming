@@ -25,6 +25,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { WeatherData, FirebaseSensorData, Crop } from "@/lib/types";
+import { useTranslation } from "@/lib/i18n";
 
 interface DashboardStatsProps {
   weather?: WeatherData;
@@ -63,6 +64,7 @@ export function DashboardStats({
   dayIndex,
   onDayIndexChange,
 }: DashboardStatsProps) {
+  const { t } = useTranslation();
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [internalIndex, setInternalIndex] = useState(0);
 
@@ -103,9 +105,9 @@ export function DashboardStats({
   const shownUv = isToday ? (weather?.uvIndex ?? day?.uvIndex) : day?.uvIndex;
 
   const title = useMemo(() => {
-    if (!day) return "Günlük Analiz";
-    return activeIndex === 0 ? "Bu gün" : formatDateLabel(day.date);
-  }, [day, activeIndex]);
+    if (!day) return t("stats.dailyAnalysis");
+    return activeIndex === 0 ? t("common.today") : formatDateLabel(day.date);
+  }, [day, activeIndex, t]);
 
   const healthBadge = useMemo(() => {
     if (!crop) return null;
@@ -182,7 +184,7 @@ export function DashboardStats({
                 {isToday && sensorData && (
                   <Badge variant="secondary" className="gap-1">
                     <Leaf className="h-3.5 w-3.5" />
-                    Sensor əsaslı
+                    {t("stats.sensorBased")}
                   </Badge>
                 )}
               </CardDescription>
@@ -197,7 +199,7 @@ export function DashboardStats({
                 onClick={() => setIndex(activeIndex - 1)}
                 disabled={!hasPrev}
                 className="rounded-full active:scale-95 transition"
-                title="Əvvəlki gün"
+                title={t("stats.prevDay")}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -213,7 +215,7 @@ export function DashboardStats({
                 onClick={() => setIndex(activeIndex + 1)}
                 disabled={!hasNext}
                 className="rounded-full active:scale-95 transition"
-                title="Sonrakı gün"
+                title={t("stats.nextDay")}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -254,7 +256,7 @@ export function DashboardStats({
                 <div className="flex items-center gap-2 rounded-xl border bg-background/50 px-3 py-2">
                   <Thermometer className="h-4 w-4" />
                   <span className="text-muted-foreground">
-                    Orta{" "}
+                    {t("stats.average")}{" "}
                     <span className="text-foreground font-semibold">
                       {Math.round(shownTemp)}°C
                     </span>
@@ -264,7 +266,7 @@ export function DashboardStats({
                 <div className="flex items-center gap-2 rounded-xl border bg-background/50 px-3 py-2">
                   <Droplets className="h-4 w-4" />
                   <span className="text-muted-foreground">
-                    Rütubət{" "}
+                    {t("stats.humidity")}{" "}
                     <span className="text-foreground font-semibold">
                       {Math.round(shownHumidity)}%
                     </span>
@@ -274,7 +276,7 @@ export function DashboardStats({
                 <div className="flex items-center gap-2 rounded-xl border bg-background/50 px-3 py-2">
                   <Wind className="h-4 w-4" />
                   <span className="text-muted-foreground">
-                    Külək{" "}
+                    {t("stats.wind")}{" "}
                     <span className="text-foreground font-semibold">
                       {Math.round(shownWind)} km/s
                     </span>
@@ -306,7 +308,7 @@ export function DashboardStats({
             <div className="rounded-2xl border bg-background/60 p-5">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <Leaf className="h-4 w-4" />
-                Torpaq nəmliyi
+                {t("stats.soilMoisture")}
               </div>
 
               <p className="mt-2 text-3xl font-semibold tracking-tight">
@@ -322,8 +324,8 @@ export function DashboardStats({
 
               <p className="mt-2 text-xs text-muted-foreground">
                 {isToday && sensorData
-                  ? "Bu gün sensor varsa göstəricilər daha dəqiqdir."
-                  : "Göstəricilər seçilmiş günün proqnozuna əsaslanır."}
+                  ? t("stats.sensorToday")
+                  : t("stats.forecastBased")}
               </p>
             </div>
 
@@ -331,7 +333,7 @@ export function DashboardStats({
             <div className="rounded-2xl border bg-background/60 p-5">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <CloudRain className="h-4 w-4" />
-                Yağış
+                {t("stats.rain")}
               </div>
 
               <p className="mt-2 text-3xl font-semibold tracking-tight">
@@ -343,8 +345,8 @@ export function DashboardStats({
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                 {typeof day?.precipitation === "number" &&
                 day.precipitation >= 5
-                  ? "Yağış ehtimalı var — suvarmanı bir qədər azaltmaq olar."
-                  : "Yağış az görünür — suvarma planını normal saxlayın."}
+                  ? t("stats.rainLikely")
+                  : t("stats.rainUnlikely")}
               </p>
             </div>
 
@@ -352,17 +354,17 @@ export function DashboardStats({
             <div className="rounded-2xl border bg-background/60 p-5">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <Thermometer className="h-4 w-4" />
-                Bitki üçün uyğunluq
+                {t("stats.cropFit")}
               </div>
 
               {!crop ? (
                 <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                  Bitki seçsən, uyğunluq analizi daha dəqiq olacaq.
+                  {t("stats.selectCropHint")}
                 </p>
               ) : (
                 <div className="mt-3 space-y-2 text-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Temperatur</span>
+                    <span className="text-muted-foreground">{t("stats.temperature")}</span>
                     <Badge
                       variant={
                         shownTemp < crop.optimalTemp.min ||
@@ -376,7 +378,7 @@ export function DashboardStats({
                   </div>
 
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Rütubət</span>
+                    <span className="text-muted-foreground">{t("stats.humidity")}</span>
                     <Badge
                       variant={
                         shownHumidity < crop.optimalHumidity.min ||
@@ -390,7 +392,7 @@ export function DashboardStats({
                   </div>
 
                   <p className="text-xs text-muted-foreground">
-                    Analiz seçilmiş günün göstəricilərinə əsaslanır.
+                    {t("stats.analysisBased")}
                   </p>
                 </div>
               )}

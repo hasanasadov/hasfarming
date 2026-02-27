@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { Location, WeatherData } from "@/lib/types";
 import Link from "next/link";
+import { useTranslation } from "@/lib/i18n";
 
 interface WeatherDisplayProps {
   location: Location;
@@ -42,40 +43,35 @@ function formatDateShort(dateStr: string) {
   return `${dd}.${mm}`;
 }
 
-function formatDayLabel(dateStr: string, index: number) {
-  if (index === 0) return "Bu gün";
-  const d = new Date(dateStr);
-  const days = ["Baz", "B.e", "Ç.a", "Ç", "C.a", "C", "Ş"];
-  return days[d.getDay()];
-}
-
 function val(x: any, fallback = "N/A") {
   return x === null || x === undefined || Number.isNaN(x) ? fallback : x;
 }
 
-function comfortBadge(temp: number, humidity: number) {
-  // super-light heuristic: feels nice for farming dashboard
-  const score =
-    100 -
-    Math.abs(temp - 22) * 3 -
-    Math.abs(humidity - 55) * 0.9;
-
-  const s = clamp(Math.round(score), 0, 100);
-  if (s >= 75) return { label: `Rahat • ${s}%`, variant: "default" as const };
-  if (s >= 55) return { label: `Normal • ${s}%`, variant: "secondary" as const };
-  return { label: `Sərt • ${s}%`, variant: "destructive" as const };
-}
-
 export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps) {
+  const { t } = useTranslation();
   const [currentWeather, setCurrentWeather] = useState<WeatherData | null>(null);
   const [forecast, setForecast] = useState<WeatherData[]>([]);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // ✅ loop olmaması üçün callback ref
   const onWeatherRef = useRef(onWeatherData);
   useEffect(() => {
     onWeatherRef.current = onWeatherData;
   }, [onWeatherData]);
+
+  function formatDayLabel(dateStr: string, index: number) {
+    if (index === 0) return t("common.today");
+    const d = new Date(dateStr);
+    const days = [t("days.sun"), t("days.mon"), t("days.tue"), t("days.wed"), t("days.thu"), t("days.fri"), t("days.sat")];
+    return days[d.getDay()];
+  }
+
+  function comfortBadge(temp: number, humidity: number) {
+    const score = 100 - Math.abs(temp - 22) * 3 - Math.abs(humidity - 55) * 0.9;
+    const s = clamp(Math.round(score), 0, 100);
+    if (s >= 75) return { label: `${t("weather.comfortable")} \u2022 ${s}%`, variant: "default" as const };
+    if (s >= 55) return { label: `${t("weather.normal")} \u2022 ${s}%`, variant: "secondary" as const };
+    return { label: `${t("weather.harsh")} \u2022 ${s}%`, variant: "destructive" as const };
+  }
 
   const query = useQuery({
     queryKey: ["weather", location.lat, location.lng],
@@ -85,7 +81,7 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
         `/api/weather?lat=${location.lat}&lng=${location.lng}`,
         { cache: "no-store" },
       );
-      if (!response.ok) throw new Error("Hava məlumatları alına bilmədi");
+      if (!response.ok) throw new Error("Weather fetch failed");
       return response.json();
     },
     refetchInterval: 10 * 60 * 1000,
@@ -93,7 +89,7 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
     retry: 1,
     staleTime: 0,
     gcTime: 1000 * 60 * 10,
-    placeholderData: (prev) => prev, // ✅ refresh zamanı UI “jump” eləməsin
+    placeholderData: (prev) => prev,
   });
 
   useEffect(() => {
@@ -132,12 +128,13 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
   const hasSoftError = query.isError && !!currentWeather;
 
   const locTitle =
-    location.address?.split(",")[0]?.trim() || "Seçilmiş məkan";
+    location.address?.split(",")[0]?.trim() || t("topbar.noLocation");
 
   const headlineBadge = useMemo(() => {
     if (!currentWeather) return null;
     return comfortBadge(currentWeather.temp, currentWeather.humidity);
-  }, [currentWeather]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWeather, t]);
 
   if (isLoading) {
     return (
@@ -163,10 +160,10 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
               <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-700 dark:text-amber-300" />
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">
-                  Hava məlumatlarını ala bilmədik
+                  {t("weather.error")}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Bağlantını yoxlayın və yenidən cəhd edin.
+                  {t("weather.retryHint")}
                 </p>
               </div>
             </div>
@@ -174,7 +171,7 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
             <div className="mt-3 flex justify-end">
               <Button onClick={() => query.refetch()} variant="outline" className="rounded-xl">
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Yenidən cəhd et
+                {t("weather.retry")}
               </Button>
             </div>
           </div>
@@ -194,7 +191,7 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/40">
                 <Cloud className="h-4 w-4" />
               </span>
-              Hava & Torpaq
+              {t("weather.weatherSoil")}
             </CardTitle>
 
             <CardDescription className="space-y-2">
@@ -203,7 +200,6 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
                 <span className="truncate">{locTitle}</span>
               </div>
 
-              {/* ✅ badges ayrı sətr + horizontal scroll => tort olmur */}
               <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pr-1 no-scrollbar">
                 {headlineBadge && (
                   <Badge variant={headlineBadge.variant} className="h-7 px-3 rounded-full shrink-0">
@@ -213,7 +209,7 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
 
                 {lastUpdate && (
                   <Badge variant="secondary" className="h-7 px-3 rounded-full shrink-0">
-                    Yeniləndi:{" "}
+                    {t("weather.updated")}:{" "}
                     {lastUpdate.toLocaleTimeString("az-AZ", {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -224,7 +220,7 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
                 {hasSoftError && (
                   <Badge variant="secondary" className="h-7 px-3 rounded-full shrink-0 gap-2">
                     <AlertTriangle className="h-3.5 w-3.5" />
-                    Yeniləmə zəifdir (son məlumat göstərilir)
+                    {t("weather.softError")}
                   </Badge>
                 )}
               </div>
@@ -238,14 +234,14 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
               className="rounded-xl"
               onClick={() => query.refetch()}
               disabled={isRefreshing}
-              title="Yenilə"
+              title={t("sensor.refresh")}
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>
 
             <Link href="/settings" className="hidden sm:block">
               <Button variant="outline" className="rounded-xl">
-                Sensorum var
+                {t("nav.settings")}
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
@@ -263,10 +259,10 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
                 <div className="min-w-0">
                   <div className="flex items-end gap-3">
                     <p className="text-4xl font-semibold tracking-tight">
-                      {Math.round(currentWeather.temp)}°C
+                      {Math.round(currentWeather.temp)}{"\u00b0C"}
                     </p>
                     <p className="text-sm text-muted-foreground pb-1">
-                      {Math.round(currentWeather.tempMin)}° / {Math.round(currentWeather.tempMax)}°
+                      {Math.round(currentWeather.tempMin)}{"\u00b0"} / {Math.round(currentWeather.tempMax)}{"\u00b0"}
                     </p>
                   </div>
 
@@ -275,7 +271,7 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
                   </p>
 
                   <p className="text-xs text-muted-foreground mt-2">
-                    {formatDateShort(currentWeather.date)} • Bu gün
+                    {formatDateShort(currentWeather.date)} {"\u2022"} {t("common.today")}
                   </p>
                 </div>
               </div>
@@ -284,7 +280,7 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
                 <div className="flex items-center gap-2">
                   <Droplets className="h-4 w-4 text-primary" />
                   <span className="text-muted-foreground">
-                    Rütubət:{" "}
+                    {t("stats.humidity")}:{" "}
                     <span className="text-foreground font-semibold">
                       {Math.round(currentWeather.humidity)}%
                     </span>
@@ -294,9 +290,9 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
                 <div className="flex items-center gap-2">
                   <Wind className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">
-                    Külək:{" "}
+                    {t("stats.wind")}:{" "}
                     <span className="text-foreground font-semibold">
-                      {Math.round(currentWeather.windSpeed)} km/saat
+                      {Math.round(currentWeather.windSpeed)} km/h
                     </span>
                   </span>
                 </div>
@@ -314,7 +310,7 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
                 <div className="flex items-center gap-2">
                   <Cloud className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">
-                    Yağıntı:{" "}
+                    {t("weather.precipitation")}:{" "}
                     <span className="text-foreground font-semibold">
                       {val(currentWeather.precipitation, "0")} mm
                     </span>
@@ -324,11 +320,11 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
                 <div className="flex items-center gap-2 col-span-2">
                   <Droplets className="h-4 w-4 text-primary" />
                   <span className="text-muted-foreground">
-                    Torpaq nəmliyi:{" "}
+                    {t("context.soilMoisture")}:{" "}
                     <span className="text-foreground font-semibold">
                       {val(Math.round(currentWeather.soilMoisture ?? 0), "N/A")}%
                     </span>
-                    <span className="text-xs opacity-70"> (təxmini)</span>
+                    <span className="text-xs opacity-70"> ({t("weather.estimated")})</span>
                   </span>
                 </div>
               </div>
@@ -341,16 +337,16 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-foreground">
-                7 Günlük proqnoz
+                {t("weather.forecast7")}
               </div>
               <div className="text-xs text-muted-foreground">
-                Sağa sürüşdürərək baxın
+                {t("weather.scrollHint")}
               </div>
             </div>
 
             <Link href="/settings" className="sm:hidden">
               <Button variant="outline" size="sm" className="rounded-xl">
-                Sensorum var
+                {t("nav.settings")}
               </Button>
             </Link>
           </div>
@@ -388,17 +384,17 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
                 <div className="mt-4 flex items-end justify-between">
                   <div>
                     <div className="text-3xl font-semibold tracking-tight">
-                      {Math.round(day.tempMax)}°
+                      {Math.round(day.tempMax)}{"\u00b0"}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Min: {Math.round(day.tempMin)}°
+                      Min: {Math.round(day.tempMin)}{"\u00b0"}
                     </div>
                   </div>
 
                   <div className="text-right">
-                    <div className="text-xs text-muted-foreground">Orta</div>
+                    <div className="text-xs text-muted-foreground">{t("stats.average")}</div>
                     <div className="text-lg font-semibold">
-                      {Math.round(day.temp)}°C
+                      {Math.round(day.temp)}{"\u00b0C"}
                     </div>
                   </div>
                 </div>
@@ -421,7 +417,7 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
                   <div className="flex items-center gap-2">
                     <Wind className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">
-                      {val(Math.round(day.windSpeed ?? 0), "N/A")} km/saat
+                      {val(Math.round(day.windSpeed ?? 0), "N/A")} km/h
                     </span>
                   </div>
 
@@ -435,8 +431,8 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
                   <div className="col-span-2 flex items-center gap-2">
                     <Droplets className="h-4 w-4 text-primary" />
                     <span className="text-muted-foreground">
-                      Torpaq nəmliyi: {val(Math.round(day.soilMoisture ?? 0), "N/A")}%
-                      <span className="text-xs opacity-70"> (təxmini)</span>
+                      {t("context.soilMoisture")}: {val(Math.round(day.soilMoisture ?? 0), "N/A")}%
+                      <span className="text-xs opacity-70"> ({t("weather.estimated")})</span>
                     </span>
                   </div>
                 </div>
@@ -445,7 +441,7 @@ export function WeatherDisplay({ location, onWeatherData }: WeatherDisplayProps)
           </div>
 
           {isRefreshing && (
-            <div className="text-xs text-muted-foreground">Yenilənir…</div>
+            <div className="text-xs text-muted-foreground">{t("weather.refreshing")}</div>
           )}
         </div>
       </CardContent>

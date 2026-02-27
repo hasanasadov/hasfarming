@@ -27,6 +27,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import type { FirebaseSensorData } from "@/lib/types";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslation } from "@/lib/i18n";
 
 interface FirebaseSensorDisplayProps {
   firebaseUrl: string; // base url: https://xxx.firebaseio.com
@@ -183,6 +184,7 @@ export function FirebaseSensorDisplay({
   onSensorData,
   onError,
 }: FirebaseSensorDisplayProps) {
+  const { t } = useTranslation();
   const base = useMemo(
     () => normalizeFirebaseBaseUrl(firebaseUrl),
     [firebaseUrl],
@@ -218,10 +220,10 @@ export function FirebaseSensorDisplay({
       if (!res.ok) throw new Error(`Firebase read failed: ${res.status}`);
 
       const json = await res.json().catch(() => null);
-      if (!json) throw new Error("Firebase payload boşdur");
+      if (!json) throw new Error("Firebase payload empty");
 
       const picked = pickSensorObject(json);
-      if (!picked) throw new Error("Uyğun sensor obyekt tapılmadı");
+      if (!picked) throw new Error("No sensor object found");
 
       const reading = parseSensor(picked);
       return { reading, raw: json };
@@ -261,7 +263,7 @@ export function FirebaseSensorDisplay({
     else setConn((c) => (c === "connected" ? "degraded" : c));
 
     const msg =
-      query.error instanceof Error ? query.error.message : "Firebase xətası";
+      query.error instanceof Error ? query.error.message : t("sensor.firebaseError");
 
     onErrorRef.current?.(msg);
   }, [query.isError, query.error]);
@@ -281,7 +283,7 @@ export function FirebaseSensorDisplay({
       return (
         <Badge className={baseClass} variant="default">
           <Wifi className="h-3.5 w-3.5" />
-          Bağlı
+          {t("sensor.connected")}
         </Badge>
       );
     }
@@ -289,17 +291,17 @@ export function FirebaseSensorDisplay({
       return (
         <Badge className={baseClass} variant="secondary">
           <AlertTriangle className="h-3.5 w-3.5" />
-          Zəif əlaqə
+          {t("sensor.degraded")}
         </Badge>
       );
     }
     return (
       <Badge className={baseClass} variant="destructive">
         <WifiOff className="h-3.5 w-3.5" />
-        Kəsildi
+        {t("sensor.disconnected")}
       </Badge>
     );
-  }, [conn]);
+  }, [conn, t]);
 
   const freshnessBadge = useMemo(() => {
     if (!sensorData?.timestamp) return null;
@@ -310,12 +312,12 @@ export function FirebaseSensorDisplay({
       <Badge
         className={cls}
         variant={freshness.stale ? "secondary" : "outline"}
-        title="Sensor məlumatının yeniliyi"
+        title={t("sensor.freshness")}
       >
         <Activity className="h-3.5 w-3.5" />
         {freshness.stale
-          ? `Köhnə • ${fmtAge(freshness.ageMs)}`
-          : `Canlı • ${fmtAge(freshness.ageMs)}`}
+          ? `${t("sensor.stale")} • ${fmtAge(freshness.ageMs)}`
+          : `${t("sensor.live")} • ${fmtAge(freshness.ageMs)}`}
       </Badge>
     );
   }, [sensorData?.timestamp, freshness]);
@@ -390,7 +392,7 @@ export function FirebaseSensorDisplay({
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/40">
                 <Database className="h-4 w-4" />
               </span>
-              Canlı sensor göstəriciləri
+              {t("sensor.liveTitle")}
             </CardTitle>
 
             {/* ✅ 2-row description => badges tort kimi yığılmır */}
@@ -424,7 +426,7 @@ export function FirebaseSensorDisplay({
                 className="rounded-xl"
                 onClick={() => query.refetch()}
                 disabled={query.isFetching}
-                title="Yenilə"
+                title={t("sensor.refresh")}
               >
                 <RefreshCw
                   className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`}
@@ -436,7 +438,7 @@ export function FirebaseSensorDisplay({
                 size="sm"
                 className="rounded-xl gap-2"
                 onClick={() => setShowRaw((v) => !v)}
-                title="Debug (raw JSON)"
+                title={t("sensor.debug")}
               >
                 Debug
                 <ChevronDown
@@ -455,11 +457,14 @@ export function FirebaseSensorDisplay({
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 mt-0.5" />
               <div className="min-w-0">
-                <div className="text-sm font-medium">Oxunuşda çətinlik var</div>
+                <div className="text-sm font-medium">{t("sensor.readError")}</div>
                 <div className="text-xs text-muted-foreground break-words">
                   {query.error instanceof Error
                     ? query.error.message
-                    : "Xəta baş verdi"}
+                    : t("sensor.errorOccurred")}
+                </div>
+<div className="text-[11px] text-muted-foreground mt-1">
+                  {t("sensor.errorHint")}
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-1">
                   * 3 ardıcıl uğursuz oxunuşdan sonra “kəsildi” kimi
@@ -474,33 +479,33 @@ export function FirebaseSensorDisplay({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard
               icon={<Droplets className="h-4 w-4" />}
-              label="Torpaq nəmliyi"
+              label={t("sensor.soilMoisture")}
               value={`${sensorData.soilMoisture.toFixed(1)}%`}
-              sub="Optimal: 40–70%"
+              sub={`${t("sensor.optimal")}: 40–70%`}
               tone={valueTone(sensorData.soilMoisture, { min: 40, max: 70 })}
             />
 
             <StatCard
               icon={<Thermometer className="h-4 w-4" />}
-              label="Torpaq temp."
+              label={t("sensor.soilTemp")}
               value={`${sensorData.soilTemperature.toFixed(1)}°C`}
-              sub="Optimal: 15–25°C"
+              sub={`${t("sensor.optimal")}: 15–25°C`}
               tone={valueTone(sensorData.soilTemperature, { min: 15, max: 25 })}
             />
 
             <StatCard
               icon={<Thermometer className="h-4 w-4" />}
-              label="Hava temp."
+              label={t("sensor.airTemp")}
               value={`${sensorData.airTemperature.toFixed(1)}°C`}
-              sub="Optimal: 18–30°C"
+              sub={`${t("sensor.optimal")}: 18–30°C`}
               tone={valueTone(sensorData.airTemperature, { min: 18, max: 30 })}
             />
 
             <StatCard
               icon={<Wind className="h-4 w-4" />}
-              label="Hava rütubəti"
+              label={t("sensor.airHumidity")}
               value={`${sensorData.humidity.toFixed(1)}%`}
-              sub="Optimal: 50–70%"
+              sub={`${t("sensor.optimal")}: 50–70%`}
               tone={valueTone(sensorData.humidity, { min: 50, max: 70 })}
             />
 
@@ -509,7 +514,7 @@ export function FirebaseSensorDisplay({
                 icon={<FlaskConical className="h-4 w-4" />}
                 label="pH"
                 value={sensorData.ph.toFixed(1)}
-                sub="Optimal: 6.0–7.0"
+                sub={`${t("sensor.optimal")}: 6.0–7.0`}
                 tone={valueTone(sensorData.ph, { min: 6.0, max: 7.0 })}
               />
             )}
@@ -517,7 +522,7 @@ export function FirebaseSensorDisplay({
             {sensorData.nitrogen !== undefined && (
               <StatCard
                 icon={<span className="text-xs font-semibold">N</span>}
-                label="Azot"
+                label={t("sensor.nitrogen")}
                 value={`${sensorData.nitrogen} mg/kg`}
                 tone="border-border/60 bg-background/50"
               />
@@ -526,7 +531,7 @@ export function FirebaseSensorDisplay({
             {sensorData.phosphorus !== undefined && (
               <StatCard
                 icon={<span className="text-xs font-semibold">P</span>}
-                label="Fosfor"
+                label={t("sensor.phosphorus")}
                 value={`${sensorData.phosphorus} mg/kg`}
                 tone="border-border/60 bg-background/50"
               />
@@ -535,7 +540,7 @@ export function FirebaseSensorDisplay({
             {sensorData.potassium !== undefined && (
               <StatCard
                 icon={<span className="text-xs font-semibold">K</span>}
-                label="Kalium"
+                label={t("sensor.potassium")}
                 value={`${sensorData.potassium} mg/kg`}
                 tone="border-border/60 bg-background/50"
               />

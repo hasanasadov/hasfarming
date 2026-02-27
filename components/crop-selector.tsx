@@ -26,6 +26,7 @@ import {
 import type { Crop } from "@/lib/types";
 import { crops } from "@/lib/crops-data";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslation } from "@/lib/i18n";
 
 /** ------------------ utils: normalize + fuzzy ------------------ **/
 const normalize = (s: string) =>
@@ -128,6 +129,7 @@ interface CropSelectorProps {
 }
 
 export function CropSelector({ onCropSelect, selectedCrop }: CropSelectorProps) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [showDetails, setShowDetails] = useState(true);
   const detailsRef = useRef<HTMLDivElement | null>(null);
@@ -162,11 +164,11 @@ export function CropSelector({ onCropSelect, selectedCrop }: CropSelectorProps) 
   const getWaterNeedsLabel = (needs: string) => {
     switch (needs) {
       case "low":
-        return "Az";
+        return t("crop.waterNeedLow");
       case "medium":
-        return "Orta";
+        return t("crop.waterNeedMedium");
       case "high":
-        return "Çox";
+        return t("crop.waterNeedHigh");
       default:
         return needs;
     }
@@ -190,9 +192,9 @@ export function CropSelector({ onCropSelect, selectedCrop }: CropSelectorProps) 
     return {
       water: getWaterNeedsLabel(selectedCrop.waterNeeds),
       temp: `${selectedCrop.optimalTemp.min}–${selectedCrop.optimalTemp.max}°C`,
-      days: `${selectedCrop.growthDays} gün`,
+      days: `${selectedCrop.growthDays} ${t("crop.daysUnit")}`,
     };
-  }, [selectedCrop]);
+  }, [selectedCrop, t]);
 
   const clearSearch = useCallback(() => setSearchQuery(""), []);
 
@@ -205,24 +207,24 @@ export function CropSelector({ onCropSelect, selectedCrop }: CropSelectorProps) 
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/40">
             <Sprout className="h-4 w-4" />
           </span>
-          Bitki seçimi
+          {t("crop.title")}
         </CardTitle>
         <CardDescription>
-          Axtarış yazılış xətasına tolerantdır (1–2 hərf).
+          {t("crop.desc")}
         </CardDescription>
 
         {/* Selected mini summary (no “tort” on mobile) */}
         {selectedCrop && quickStats && (
           <div className="mt-3 flex items-center gap-2 overflow-x-auto whitespace-nowrap pr-1 no-scrollbar">
             <Badge variant="secondary" className="rounded-full h-7 px-3 shrink-0">
-              Seçildi: <span className="ml-1 font-semibold">{selectedCrop.nameAz}</span>
+              {t("crop.selected")} <span className="ml-1 font-semibold">{selectedCrop.nameAz}</span>
             </Badge>
             <Badge
               variant="secondary"
               className={cx("rounded-full h-7 px-3 shrink-0", getWaterNeedsBadge(selectedCrop.waterNeeds))}
             >
               <Droplets className="h-3.5 w-3.5 mr-1" />
-              Su: {quickStats.water}
+              {t("crop.water")}: {quickStats.water}
             </Badge>
             <Badge variant="secondary" className="rounded-full h-7 px-3 shrink-0">
               <Thermometer className="h-3.5 w-3.5 mr-1" />
@@ -242,7 +244,7 @@ export function CropSelector({ onCropSelect, selectedCrop }: CropSelectorProps) 
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Məs: pambiq, qarğıdalı, buğda..."
+              placeholder={t("crop.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 h-11 rounded-xl"
@@ -256,13 +258,13 @@ export function CropSelector({ onCropSelect, selectedCrop }: CropSelectorProps) 
                 variant="outline"
                 className="rounded-xl"
                 onClick={clearSearch}
-                title="Təmizlə"
+                title={t("crop.clear")}
               >
                 <X className="h-4 w-4" />
               </Button>
             )}
             <Badge variant="secondary" className="rounded-full h-11 px-4 hidden sm:inline-flex">
-              {filteredCrops.length} nəticə
+              {filteredCrops.length} {t("crop.resultsCount")}
             </Badge>
           </div>
         </div>
@@ -298,7 +300,7 @@ export function CropSelector({ onCropSelect, selectedCrop }: CropSelectorProps) 
                       "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium",
                       getWaterNeedsBadge(crop.waterNeeds),
                     )}
-                    title="Su tələbatı"
+                    title={t("crop.waterNeed")}
                   >
                     <Droplets className="h-3.5 w-3.5" />
                     {getWaterNeedsLabel(crop.waterNeeds)}
@@ -316,7 +318,7 @@ export function CropSelector({ onCropSelect, selectedCrop }: CropSelectorProps) 
                   <div className="rounded-xl border border-border/60 bg-muted/20 px-2.5 py-2">
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <Thermometer className="h-3.5 w-3.5" />
-                      Optimal temp
+                      {t("crop.optimalTemp")}
                     </div>
                     <p className="text-sm font-semibold text-foreground">
                       {crop.optimalTemp.min}–{crop.optimalTemp.max}°C
@@ -326,10 +328,10 @@ export function CropSelector({ onCropSelect, selectedCrop }: CropSelectorProps) 
                   <div className="rounded-xl border border-border/60 bg-muted/20 px-2.5 py-2">
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <Timer className="h-3.5 w-3.5" />
-                      Yetişmə
+                      {t("crop.growthDays")}
                     </div>
                     <p className="text-sm font-semibold text-foreground">
-                      {crop.growthDays} gün
+                      {crop.growthDays} {t("crop.daysUnit")}
                     </p>
                   </div>
                 </div>
@@ -344,10 +346,10 @@ export function CropSelector({ onCropSelect, selectedCrop }: CropSelectorProps) 
               <Info className="h-4 w-4" />
             </div>
             <p className="mt-3 font-semibold text-foreground">
-              Heç bir bitki tapılmadı
+              {t("crop.noResult")}
             </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Yazılışı fərqli yoxlayın (məs: “pambiq”, “qarğidali”).
+<p className="text-sm text-muted-foreground mt-1">
+              {t("crop.noResultHint")}
             </p>
           </div>
         )}
@@ -394,30 +396,30 @@ export function CropSelector({ onCropSelect, selectedCrop }: CropSelectorProps) 
             <MotionSection show={showDetails}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div className="rounded-xl border border-border/60 bg-background/60 p-3">
-                  <p className="text-muted-foreground">Optimal temperatur</p>
+                  <p className="text-muted-foreground">{t("crop.optimalTemperature")}</p>
                   <p className="font-semibold text-foreground">
                     {selectedCrop.optimalTemp.min}°C – {selectedCrop.optimalTemp.max}°C
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-border/60 bg-background/60 p-3">
-                  <p className="text-muted-foreground">Optimal rütubət</p>
+                  <p className="text-muted-foreground">{t("crop.optimalHumidity")}</p>
                   <p className="font-semibold text-foreground">
                     {selectedCrop.optimalHumidity.min}% – {selectedCrop.optimalHumidity.max}%
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-border/60 bg-background/60 p-3">
-                  <p className="text-muted-foreground">pH aralığı</p>
+                  <p className="text-muted-foreground">{t("crop.phRange")}</p>
                   <p className="font-semibold text-foreground">
                     {selectedCrop.optimalPh.min} – {selectedCrop.optimalPh.max}
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-border/60 bg-background/60 p-3">
-                  <p className="text-muted-foreground">Yetişmə müddəti</p>
+                  <p className="text-muted-foreground">{t("crop.growthDuration")}</p>
                   <p className="font-semibold text-foreground">
-                    {selectedCrop.growthDays} gün
+                    {selectedCrop.growthDays} {t("crop.daysUnit")}
                   </p>
                 </div>
               </div>

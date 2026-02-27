@@ -12,10 +12,12 @@ import {
   ThermometerSun,
   ChevronDown,
 } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export function ContextPreview() {
   const { location, selectedCrop, dayIndex, forecast, dataSource, sensorData } =
     useAppStore();
+  const { t } = useTranslation();
 
   const [open, setOpen] = useState(false);
 
@@ -36,8 +38,8 @@ export function ContextPreview() {
   const tempDisplay =
     tempMax != null && tempMin != null ? `${tempMax}° / ${tempMin}°` : "—";
 
-  const place = location?.address?.split(",")[0] ?? "Məkan seçilməyib";
-  const cropName = selectedCrop?.nameAz ?? "Bitki seçilməyib";
+  const place = location?.address?.split(",")[0] ?? t("topbar.noLocation");
+  const cropName = selectedCrop?.nameAz ?? t("topbar.noCrop");
   const cropIcon = selectedCrop?.icon ?? "🌱";
 
   return (
@@ -64,7 +66,7 @@ export function ContextPreview() {
             <div className="flex items-center gap-2 min-w-0">
               <div className="truncate text-sm font-semibold">{cropName}</div>
               <span className="text-xs text-muted-foreground whitespace-nowrap">
-                • {dayIndex === 0 ? "Bu gün" : `${dayIndex + 1}-ci gün`}
+                • {dayIndex === 0 ? t("common.today") : `${dayIndex + 1}${t("context.nthDay")}`}
               </span>
             </div>
 
@@ -101,7 +103,7 @@ export function ContextPreview() {
                   <div className="rounded-xl border bg-background/50 px-3 py-2">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <ThermometerSun className="h-4 w-4" />
-                      Temperatur
+                      {t("context.temperature")}
                     </div>
                     <div className="mt-1 text-sm font-semibold">
                       {tempDisplay}
@@ -111,7 +113,7 @@ export function ContextPreview() {
                   <div className="rounded-xl border bg-background/50 px-3 py-2">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Droplets className="h-4 w-4" />
-                      Torpaq nəmliyi
+                      {t("context.soilMoisture")}
                     </div>
                     <div className="mt-1 text-sm font-semibold">
                       {soilDisplay}
@@ -123,7 +125,7 @@ export function ContextPreview() {
                 <div className="rounded-xl border bg-background/50 px-3 py-2">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <MapPin className="h-4 w-4" />
-                    Məkan
+                    {t("context.location")}
                   </div>
                   <div className="mt-1 text-sm font-semibold truncate">
                     {place}
@@ -138,9 +140,9 @@ export function ContextPreview() {
                     variant="secondary"
                     className="rounded-xl w-full justify-center"
                   >
-                    <Link href="/weather" aria-label="Məkan və hava">
+                    <Link href="/weather" aria-label={t("nav.weather")}>
                       <MapPin className="h-4 w-4 mr-2" />
-                      Məkan
+                      {t("context.location")}
                     </Link>
                   </Button>
 
@@ -150,9 +152,9 @@ export function ContextPreview() {
                     variant="secondary"
                     className="rounded-xl w-full justify-center"
                   >
-                    <Link href="/crops" aria-label="Bitki seç">
+                    <Link href="/crops" aria-label={t("nav.crops")}>
                       <Sprout className="h-4 w-4 mr-2" />
-                      Bitki
+                      {t("context.crop")}
                     </Link>
                   </Button>
                 </div>

@@ -13,39 +13,41 @@ import {
   CheckCircle2,
   Sparkles,
 } from "lucide-react";
-import { motion, AnimatePresence ,Variants } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
+import { useTranslation } from "@/lib/i18n";
+import type { TranslationKey } from "@/lib/i18n";
 
 type GuardNeed = "location" | "weather" | "crop";
 
 const NEED_META: Record<
   GuardNeed,
   {
-    title: string;
-    desc: string;
+    titleKey: TranslationKey;
+    descKey: TranslationKey;
     href: string;
-    cta: string;
+    ctaKey: TranslationKey;
     icon: React.ReactNode;
   }
 > = {
   location: {
-    title: "Məkan",
-    desc: "Proqnoz və analiz daha dəqiq olsun deyə məkanı seçək.",
+    titleKey: "guard.locationTitle",
+    descKey: "guard.locationDesc",
     href: "/weather",
-    cta: "Məkanı seç",
+    ctaKey: "guard.locationCta",
     icon: <MapPin className="h-4 w-4" />,
   },
   weather: {
-    title: "Hava məlumatı",
-    desc: "Proqnoz yüklənsin — sensor varsa əlavə etmək də olar.",
+    titleKey: "guard.weatherTitle",
+    descKey: "guard.weatherDesc",
     href: "/weather",
-    cta: "Proqnozu yüklə",
+    ctaKey: "guard.weatherCta",
     icon: <CloudSun className="h-4 w-4" />,
   },
   crop: {
-    title: "Bitki",
-    desc: "Tövsiyələr uyğun hesablansın deyə bitkini seçək.",
+    titleKey: "guard.cropTitle",
+    descKey: "guard.cropDesc",
     href: "/crops",
-    cta: "Bitkini seç",
+    ctaKey: "guard.cropCta",
     icon: <Sprout className="h-4 w-4" />,
   },
 };
@@ -73,6 +75,7 @@ export function RouteGuard({
   children: React.ReactNode;
 }) {
   const { location, currentWeather, forecast, selectedCrop } = useAppStore();
+  const { t } = useTranslation();
 
   const missing: GuardNeed[] = [];
 
@@ -88,7 +91,6 @@ export function RouteGuard({
 
   return (
     <Card className="relative overflow-hidden p-6 md:p-8">
-      {/* soft background */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-muted/40 via-background to-background" />
 
       <motion.div
@@ -97,26 +99,24 @@ export function RouteGuard({
         initial="hidden"
         animate="show"
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <h2 className="text-xl md:text-2xl font-semibold tracking-tight">
-              Kiçik bir quraşdırma qalıb
+              {t("guard.title")}
             </h2>
             <p className="text-sm md:text-base text-muted-foreground">
-              Bir neçə addımı tamamlayıb daha dəqiq nəticələr əldə edək.
+              {t("guard.desc")}
             </p>
           </div>
 
           <div className="hidden md:flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1.5 backdrop-blur">
             <Sparkles className="h-4 w-4" />
             <span className="text-sm font-medium">
-              {done}/{total} hazırdır
+              {done}/{total} {t("common.ready")}
             </span>
           </div>
         </div>
 
-        {/* Soft status chips */}
         <div className="flex flex-wrap gap-2">
           {need.map((n) => {
             const isMissing = missing.includes(n);
@@ -131,18 +131,18 @@ export function RouteGuard({
                 ].join(" ")}
                 title={
                   isMissing
-                    ? "Bu addımı tamamlasanız daha dəqiq nəticə alarsınız"
-                    : "Hazırdır"
+                    ? t("guard.missingHint")
+                    : t("guard.doneHint")
                 }
               >
                 {NEED_META[n].icon}
-                <span className="font-medium">{NEED_META[n].title}</span>
+                <span className="font-medium">{t(NEED_META[n].titleKey)}</span>
                 {isMissing ? (
-                  <span className="opacity-80">tamamlayaq</span>
+                  <span className="opacity-80">{t("guard.complete")}</span>
                 ) : (
                   <span className="inline-flex items-center gap-1 opacity-90">
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    hazır
+                    {t("guard.done")}
                   </span>
                 )}
               </div>
@@ -150,12 +150,8 @@ export function RouteGuard({
           })}
         </div>
 
-        {/* Action list (animated) */}
         <AnimatePresence initial={false}>
-          <motion.div
-            className="grid gap-3 md:grid-cols-2"
-            layout
-          >
+          <motion.div className="grid gap-3 md:grid-cols-2" layout>
             {missing.map((n) => (
               <motion.div
                 key={n}
@@ -175,20 +171,20 @@ export function RouteGuard({
 
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="font-semibold">{NEED_META[n].title}</p>
+                      <p className="font-semibold">{t(NEED_META[n].titleKey)}</p>
                       <span className="text-xs rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 px-2 py-1 border border-amber-500/20">
-                        tövsiyə olunur
+                        {t("guard.recommended")}
                       </span>
                     </div>
 
                     <p className="text-sm text-muted-foreground">
-                      {NEED_META[n].desc}
+                      {t(NEED_META[n].descKey)}
                     </p>
 
                     <div className="pt-3">
                       <Button asChild className="w-full justify-between">
                         <Link href={NEED_META[n].href}>
-                          {NEED_META[n].cta}
+                          {t(NEED_META[n].ctaKey)}
                           <ArrowRight className="h-4 w-4" />
                         </Link>
                       </Button>
@@ -200,13 +196,12 @@ export function RouteGuard({
           </motion.div>
         </AnimatePresence>
 
-        {/* Secondary quick links */}
         <div className="flex flex-wrap gap-2 pt-1">
           <Button asChild variant="secondary">
-            <Link href="/weather">Hava & Məkan</Link>
+            <Link href="/weather">{t("guard.weatherAndLocation")}</Link>
           </Button>
           <Button asChild variant="secondary">
-            <Link href="/crops">Bitkilər</Link>
+            <Link href="/crops">{t("guard.crops")}</Link>
           </Button>
         </div>
       </motion.div>

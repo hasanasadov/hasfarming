@@ -29,6 +29,7 @@ import {
 import type { Location } from "@/lib/types";
 import { MapPicker } from "./map-picker";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslation } from "@/lib/i18n";
 
 interface LocationPickerProps {
   onLocationSelect: (location: Location) => void;
@@ -112,6 +113,7 @@ export function LocationPicker({
   onLocationSelect,
   selectedLocation,
 }: LocationPickerProps) {
+  const { t } = useTranslation();
   const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -147,7 +149,7 @@ export function LocationPicker({
     setNotice(null);
 
     if (!navigator.geolocation) {
-      setError("Brauzeriniz geolokasiya dəstəkləmir.");
+      setError(t("location.geoNotSupported"));
       setIsGettingLocation(false);
       return;
     }
@@ -158,10 +160,10 @@ export function LocationPicker({
         const address = await reverseGeocode(latitude, longitude);
         onLocationSelect({ lat: latitude, lng: longitude, address });
         setIsGettingLocation(false);
-        setNotice("Məkan seçildi.");
+        setNotice(t("location.selected"));
       },
       () => {
-        setError("Məkanı ala bilmədik. İcazə verdiyinizə əmin olun.");
+        setError(t("location.geoError"));
         setIsGettingLocation(false);
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
@@ -177,9 +179,9 @@ export function LocationPicker({
       });
       setSearchResults([]);
       setError(null);
-      setNotice("Məkan seçildi.");
+      setNotice(t("location.selected"));
     },
-    [onLocationSelect],
+    [onLocationSelect, t],
   );
 
   const handleManualInput = useCallback(async () => {
@@ -190,11 +192,11 @@ export function LocationPicker({
     const lng = parseFloat(manualLng);
 
     if (Number.isNaN(lat) || Number.isNaN(lng)) {
-      setError("Düzgün koordinatlar daxil edin.");
+      setError(t("location.coordError"));
       return;
     }
     if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      setError("Koordinatlar sərhəddən kənardır.");
+      setError(t("location.coordRange"));
       return;
     }
 
@@ -205,8 +207,8 @@ export function LocationPicker({
 
     setManualLat("");
     setManualLng("");
-    setNotice("Məkan seçildi.");
-  }, [manualLat, manualLng, onLocationSelect, reverseGeocode]);
+    setNotice(t("location.selected"));
+  }, [manualLat, manualLng, onLocationSelect, reverseGeocode, t]);
 
   const runSearch = useCallback(async (raw: string) => {
     const q0 = raw.trim();
@@ -214,7 +216,7 @@ export function LocationPicker({
 
     if (q0.length < 2) {
       setSearchResults([]);
-      setError("Ən az 2 simvol yazın.");
+      setError(t("location.minChars"));
       return;
     }
 
@@ -236,7 +238,7 @@ export function LocationPicker({
       const response = await fetch(url, {
         headers: { "User-Agent": "AgriSense Smart Farming App" },
       });
-      if (!response.ok) throw new Error("Axtarış uğursuz oldu.");
+      if (!response.ok) throw new Error(t("location.searchFailed"));
 
       const data = await response.json();
       const mapped: SearchResult[] = (data || []).map(
@@ -266,13 +268,13 @@ export function LocationPicker({
 
         if (scored.length > 0) {
           setSearchResults(scored);
-          setNotice("Tam uyğun nəticə tapılmadı — oxşar yerlər göstərildi.");
+          setNotice(t("location.fuzzyHint"));
         } else {
-          setError("Heç bir nəticə tapılmadı.");
+          setError(t("location.noResult"));
         }
       }
     } catch {
-      setError("Axtarış zamanı xəta baş verdi.");
+      setError(t("location.searchError"));
     } finally {
       setIsSearching(false);
     }
@@ -292,8 +294,9 @@ export function LocationPicker({
   }, [searchQuery, runSearch]);
 
   const resultsTitle = useMemo(() => {
-    if (isSearching) return "Axtarılır…";
-    if (searchResults.length > 0) return "Nəticələr";
+    if (isSearching) return t("location.searching");
+    if (searchResults.length > 0) return `${searchResults.length}`;
+
     return null;
   }, [isSearching, searchResults.length]);
 
@@ -302,13 +305,13 @@ export function LocationPicker({
     const text = `${selectedLocation.lat.toFixed(6)}, ${selectedLocation.lng.toFixed(6)}`;
     try {
       await navigator.clipboard.writeText(text);
-      setNotice("Koordinatlar kopyalandı.");
+      setNotice(t("location.copyCoords"));
       setError(null);
     } catch {
       setNotice(null);
-      setError("Kopyalama mümkün olmadı.");
+      setError(t("location.copyFailed"));
     }
-  }, [selectedLocation]);
+  }, [selectedLocation, t]);
 
   return (
     <Card className="relative overflow-hidden border-border/60 bg-background/60 backdrop-blur">
@@ -319,11 +322,10 @@ export function LocationPicker({
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/40">
             <MapPin className="h-4 w-4" />
           </span>
-          Məkan seçimi
+          {t("location.title")}
         </CardTitle>
         <CardDescription>
-          Canlı məkan götür, ünvanla axtar, xəritədən seç və ya koordinat daxil
-          et.
+          {t("location.desc")}
         </CardDescription>
       </CardHeader>
 
@@ -335,10 +337,10 @@ export function LocationPicker({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Badge className="rounded-full" variant="secondary">
-                    Seçildi
+                    {t("crop.selected")}
                   </Badge>
                   <div className="text-sm font-semibold text-foreground truncate">
-                    {selectedLocation.address || "Seçilmiş məkan"}
+                    {selectedLocation.address || t("location.selectedLocation")}
                   </div>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
@@ -353,7 +355,7 @@ export function LocationPicker({
                 size="icon"
                 className="rounded-xl shrink-0"
                 onClick={copyCoords}
-                title="Koordinatları kopyala"
+                title={t("location.copyTitle")}
               >
                 <Copy className="h-4 w-4" />
               </Button>
@@ -366,10 +368,10 @@ export function LocationPicker({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">
-                Canlı məkan
+                {t("location.liveLocation")}
               </p>
               <p className="text-xs text-muted-foreground">
-                GPS ilə dəqiq məkanınız götürüləcək.
+                GPS
               </p>
             </div>
 
@@ -383,7 +385,7 @@ export function LocationPicker({
               ) : (
                 <LocateFixed className="h-4 w-4" />
               )}
-              Canlı məkanımı istifadə et
+              {t("location.useLive")}
             </Button>
           </div>
         </div>
@@ -404,17 +406,17 @@ export function LocationPicker({
               </span>
               <div className="text-left">
                 <p className="text-sm font-semibold text-foreground">
-                  Axtarış / Koordinat
+                  {t("location.searchCoord")}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Ünvan axtar və ya əl ilə daxil et
+                  {t("location.searchCoordDesc")}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="rounded-full">
-                {isAdvancedOpen ? "Açıq" : "Bağlı"}
+                {isAdvancedOpen ? t("location.open") : t("location.closed")}
               </Badge>
               {isAdvancedOpen ? (
                 <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -432,10 +434,10 @@ export function LocationPicker({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
-                    Axtarış
+                    {t("location.searchTab")}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Məs: Bakı, Sumqayıt, park, kənd…
+                    {t("location.searchHint")}
                   </p>
                 </div>
                 <Badge className="rounded-full" variant="secondary">
@@ -447,7 +449,7 @@ export function LocationPicker({
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Axtarın…"
+                    placeholder={t("location.searchPlaceholder")}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) =>
@@ -468,7 +470,7 @@ export function LocationPicker({
                       setNotice(null);
                     }}
                     className="rounded-xl px-3"
-                    title="Təmizlə"
+                    title={t("crop.clear")}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -486,7 +488,7 @@ export function LocationPicker({
                   ) : (
                     <Search className="h-4 w-4" />
                   )}
-                  Axtar
+                  {t("location.searchBtn")}
                 </Button>
               </div>
 
@@ -515,7 +517,7 @@ export function LocationPicker({
 
                   {searchResults.length === 0 && !isSearching && (
                     <div className="px-4 py-3 text-sm text-muted-foreground">
-                      Yazmağa başlayın (ən az 2 simvol).
+                      {t("location.startTyping")}
                     </div>
                   )}
                 </div>
@@ -525,15 +527,15 @@ export function LocationPicker({
             {/* Manual coords */}
             <div className="rounded-2xl border bg-background/60 p-4">
               <p className="text-sm font-semibold text-foreground">
-                Koordinatla seçim
+                {t("location.coordTab")}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Enlik (lat) və uzunluq (lng) daxil edin.
+                {t("location.coordDesc")}
               </p>
 
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
                 <Input
-                  placeholder="Enlik (lat)"
+                  placeholder={t("location.latPlaceholder")}
                   value={manualLat}
                   onChange={(e) => setManualLat(e.target.value)}
                   type="number"
@@ -541,7 +543,7 @@ export function LocationPicker({
                   className="rounded-xl"
                 />
                 <Input
-                  placeholder="Uzunluq (lng)"
+                  placeholder={t("location.lngPlaceholder")}
                   value={manualLng}
                   onChange={(e) => setManualLng(e.target.value)}
                   type="number"
@@ -560,7 +562,7 @@ export function LocationPicker({
                   ) : (
                     <Navigation className="h-4 w-4" />
                   )}
-                  Tətbiq et
+                  {t("location.apply")}
                 </Button>
               </div>
             </div>
@@ -583,17 +585,17 @@ export function LocationPicker({
               </span>
               <div className="text-left">
                 <p className="text-sm font-semibold text-foreground">
-                  Xəritə ilə seçim
+                  {t("location.mapTab")}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Xəritədə pin qoyaraq dəqiqləşdir
+                  {t("location.mapDesc")}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="rounded-full">
-                {isMapOpen ? "Açıq" : "Bağlı"}
+                {isMapOpen ? t("location.open") : t("location.closed")}
               </Badge>
               {isMapOpen ? (
                 <ChevronUp className="h-4 w-4 text-muted-foreground" />

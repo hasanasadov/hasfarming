@@ -1,3 +1,5 @@
+import { useTranslation } from "@/lib/i18n";
+
 // app/api/chat/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,10 +9,17 @@ type IncomingMessage = { role: Role; content: string };
 
 function buildSystemPrompt(context: any) {
   const ctx = context ? JSON.stringify(context, null, 2) : "{}";
+  const locale = context?.meta?.locale || "az";
+  const language =
+    locale === "az"
+      ? "Azərbaycan dili"
+      : locale === "en"
+        ? "English"
+        : "Russian";
 
   return `
-Sən Bərəkət platformasının peşəkar aqronom köməkçisisən.
-Dil: Azərbaycan dili.
+Sən Prospera platformasının peşəkar aqronom köməkçisisən.
+Cavablayacağın dil: Səndən soruşulan sualın dilinə əsaslanır, amma əgər müəyyən etmək mümkün deyilsə, cavab "${language}" dilində olacaq, bu da olmazsa "Azərbaycan dili" olacaq.
 
 Sənə "context" verilir. Sən MÜTLƏQ bu context-ə əsaslanmalısan.
 Context JSON:
