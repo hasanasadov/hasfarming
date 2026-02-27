@@ -21,6 +21,7 @@ import {
   Plug,
   Unplug,
 } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 type ValidateResult =
   | { ok: true; normalizedUrl: string; sample?: any }
@@ -48,6 +49,7 @@ export function SensorConnectSheet({
   onDisconnect,
   isConnected,
 }: SensorConnectSheetProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [firebaseUrl, setFirebaseUrl] = useState(initialUrl || "");
   const [isValidating, setIsValidating] = useState(false);
@@ -73,7 +75,7 @@ export function SensorConnectSheet({
   const validate = async () => {
     const base = normalizeFirebaseBaseUrl(firebaseUrl);
     if (!base) {
-      setError("Firebase URL daxil edin");
+      setError(t("sc.urlEmpty"));
       setIsValid(false);
       return;
     }
@@ -83,7 +85,7 @@ export function SensorConnectSheet({
       !base.includes("firebaseio.com") &&
       !base.includes("firebasedatabase.app")
     ) {
-      setError("Düzgün Firebase Realtime Database URL daxil edin");
+      setError(t("sc.urlInvalid"));
       setIsValid(false);
       return;
     }
@@ -107,7 +109,7 @@ export function SensorConnectSheet({
       if (!res.ok || !data || (data as any).ok === false) {
         const msg =
           (data as any)?.error ||
-          "Yoxlama alınmadı. URL, rules (permission), və ya network problemi ola bilər.";
+          t("sc.validateFailed");
         throw new Error(msg);
       }
 
@@ -116,7 +118,7 @@ export function SensorConnectSheet({
       setIsValid(true);
       setError(null);
     } catch (e: any) {
-      setError(e?.message || "Firebase URL yoxlanıla bilmədi");
+      setError(e?.message || t("sc.validateError"));
       setIsValid(false);
     } finally {
       setIsValidating(false);
@@ -143,10 +145,10 @@ export function SensorConnectSheet({
           className="w-full justify-start gap-2"
         >
           <Database className="h-4 w-4" />
-          Sensorum var
+          {t("sc.hasSensor")}
           {isConnected && (
             <Badge variant="secondary" className="ml-auto">
-              Qoşulu
+              {t("sc.connected")}
             </Badge>
           )}
         </Button>
@@ -157,16 +159,16 @@ export function SensorConnectSheet({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Database className="h-5 w-5 text-primary" />
-            Sensor qoşulması
+            {t("sc.title")}
           </SheetTitle>
           <SheetDescription>
-            Firebase Realtime Database URL daxil et, yoxla və sonra qoş.
+            {t("sc.desc")}
           </SheetDescription>
         </SheetHeader>
 
         <div className="mt-6 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="fburl">Firebase DB URL</Label>
+            <Label htmlFor="fburl">{t("sc.label")}</Label>
             <Input
               id="fburl"
               placeholder="https://your-project.firebaseio.com"
@@ -197,7 +199,7 @@ export function SensorConnectSheet({
             <div className="flex gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
               <CheckCircle2 className="h-4 w-4 text-primary mt-0.5" />
               <div className="text-foreground">
-                URL uğurlu yoxlandı
+                {t("sc.urlOk")}
                 {normalized && (
                   <div className="mt-1 text-xs text-muted-foreground break-all">
                     Normalized: {normalized}
@@ -220,7 +222,7 @@ export function SensorConnectSheet({
               ) : (
                 <CheckCircle2 className="h-4 w-4" />
               )}
-              Yoxla
+              {t("ds.validate")}
             </Button>
 
             {!isConnected ? (
@@ -231,7 +233,7 @@ export function SensorConnectSheet({
                 className="flex-1 gap-2"
               >
                 <Plug className="h-4 w-4" />
-                Qoş
+                {t("sc.connect")}
               </Button>
             ) : (
               <Button
@@ -241,16 +243,14 @@ export function SensorConnectSheet({
                 className="flex-1 gap-2"
               >
                 <Unplug className="h-4 w-4" />
-                Ayır
+                {t("sc.disconnect")}
               </Button>
             )}
           </div>
 
           <div className="rounded-lg border bg-muted/40 p-3">
             <p className="text-xs text-muted-foreground">
-              <strong>Qeyd:</strong> Əgər “permission denied” çıxsa, Firebase
-              rules private-dir. Onda ya read icazəsi verilməlidir, ya da
-              tokenlə işləməliyik.
+              {t("sc.note")}
             </p>
           </div>
         </div>
