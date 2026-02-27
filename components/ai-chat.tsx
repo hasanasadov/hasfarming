@@ -37,6 +37,7 @@ import { useAppStore, buildThreadMeta } from "@/lib/store/app-store"; // <-- yol
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 
 interface AIChatProps {
   location: Location | null;
@@ -91,6 +92,7 @@ export function AIChat({
   dataSource,
 }: AIChatProps) {
   const router = useRouter();
+  const { t: tr } = useTranslation();
 
   const scrollWrapRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -109,13 +111,13 @@ export function AIChat({
 
   const quickPrompts = useMemo(
     () => [
-      "Bu gün suvarım, yoxsa gözləyim?",
-      "Sabah yağışa görə nə etməliyəm?",
-      "Torpaq nəmliyi aşağıdırsa nə qədər su verim?",
-      "Bu həftə gübrə üçün plan ver",
-      "Risk varmı? (temperatur/yağış/külək)",
+      tr("chat.prompt1"),
+      tr("chat.prompt2"),
+      tr("chat.prompt3"),
+      tr("chat.prompt4"),
+      tr("chat.prompt5"),
     ],
-    [],
+    [tr],
   );
 
   const cropNameAz = crop?.nameAz || "Bitki";
@@ -182,17 +184,12 @@ export function AIChat({
           useAppStore.getState().appendChatMessage(activeKey, {
             id: "welcome",
             role: "assistant",
-            content:
-              `Salam! Mən **Bərəkət AI** köməkçisiyəm.\n\n` +
-              `📌 Məkan + hava + **${cropNameAz}** konteksti ilə sizə dəqiq tövsiyə verəcəyəm.\n\n` +
-              `İstəsəniz: “Bu gün suvarım?”`,
+            content: tr("chat.welcome").replace("{{crop}}", cropNameAz),
           });
         }
       } catch (err) {
         console.error("AI Connection Failed:", err);
-        setConnectionError(
-          "Serverə qoşulmaq mümkün olmadı. İnterneti və deploy statusu yoxlayın.",
-        );
+        setConnectionError(tr("chat.connectionError"));
       } finally {
         setIsChecking(false);
       }
@@ -328,7 +325,7 @@ export function AIChat({
           appendChatMessage(threadKey, {
             id: (Date.now() + 1).toString(),
             role: "assistant",
-            content: `⚠️ Limit doldu. ${data.retryDelay || "10s"} sonra yenidən yoxlayın.`,
+            content: tr("chat.rateLimit").replace("{{delay}}", data.retryDelay || "10s"),
           });
           return;
         }
@@ -361,8 +358,7 @@ export function AIChat({
         appendChatMessage(threadKey, {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content:
-            "❌ **Xəta:** Server xətası oldu. Zəhmət olmasa yenidən yoxlayın.",
+          content: tr("chat.serverError"),
         });
       } finally {
         setIsLoading(false);
@@ -413,7 +409,7 @@ export function AIChat({
           />
           <div className="absolute right-0 top-0 h-full w-[92%] max-w-[420px] bg-background border-l shadow-xl flex flex-col">
             <div className="p-4 border-b flex items-center justify-between">
-              <div className="font-semibold">Söhbətlər</div>
+              <div className="font-semibold">{tr("chat.threads")}</div>
               <Button
                 variant="ghost"
                 size="icon"
@@ -426,7 +422,7 @@ export function AIChat({
             <div className="p-3 overflow-auto flex-1 space-y-2">
               {sortedThreads.length === 0 ? (
                 <div className="text-sm text-muted-foreground p-3">
-                  Hələ söhbət yoxdur.
+                  {tr("chat.noThreads")}
                 </div>
               ) : (
                 sortedThreads.map((t) => {
@@ -452,8 +448,8 @@ export function AIChat({
                           </div>
                           <div className="text-xs text-muted-foreground truncate mt-0.5">
                             {last
-                              ? `${last.role === "user" ? "Sən: " : "AI: "}${last.content}`
-                              : "Boş söhbət"}
+                              ? `${last.role === "user" ? `${tr("chat.you")}: ` : "AI: "}${last.content}`
+                              : tr("chat.emptyThread")}
                           </div>
                           <div className="text-[11px] text-muted-foreground mt-1">
                             {formatTime(t.updatedAt)}
@@ -495,7 +491,7 @@ export function AIChat({
             </div>
 
             <div className="p-3 border-t text-xs text-muted-foreground">
-              Thread-lər məkan + bitki kontekstinə görə saxlanılır.
+              {tr("chat.threadsHint")}
             </div>
           </div>
         </div>
@@ -532,7 +528,7 @@ export function AIChat({
                 className="gap-2"
               >
                 <MessageSquareText className="h-4 w-4" />
-                Söhbətlər
+                {tr("chat.threads")}
               </Button>
             )}
 
@@ -558,7 +554,7 @@ export function AIChat({
                 onClick={() => setShowPrompts((v) => !v)}
                 className="text-xs text-muted-foreground inline-flex items-center gap-1"
               >
-                Hazır suallar
+                {tr("chat.quickPrompts")}
                 {showPrompts ? (
                   <ChevronUp className="h-4 w-4" />
                 ) : (
@@ -614,7 +610,7 @@ export function AIChat({
         {isChecking ? (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground py-14">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <p className="text-base">AI sistemi yoxlanılır…</p>
+            <p className="text-base">{tr("chat.checking")}</p>
           </div>
         ) : connectionError ? (
           <div className="h-full flex flex-col items-center justify-center gap-4 p-6 text-center py-14">
@@ -622,14 +618,14 @@ export function AIChat({
               <WifiOff className="h-8 w-8 text-red-500" />
             </div>
             <div className="space-y-2">
-              <h3 className="font-bold text-lg">Əlaqə Qurulmadı</h3>
+              <h3 className="font-bold text-lg">{tr("chat.noConnection")}</h3>
               <p className="text-sm text-muted-foreground max-w-[360px] mx-auto">
                 {connectionError}
               </p>
             </div>
             <Button variant="outline" onClick={() => window.location.reload()}>
               <RefreshCw className="mr-2 h-4 w-4" />
-              Yenilə
+              {tr("chat.refresh")}
             </Button>
           </div>
         ) : (
@@ -687,7 +683,7 @@ export function AIChat({
                     <div className="flex items-center gap-2">
                       <TypingDots />
                       <span className="text-sm text-muted-foreground">
-                        AI yazır…
+                        {tr("chat.typing")}
                       </span>
                     </div>
                   </div>
@@ -709,7 +705,7 @@ export function AIChat({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Mesaj yaz…"
+              placeholder={tr("chat.placeholder")}
               disabled={isLoading || !!connectionError || isChecking}
               className={cn(
                 "min-h-[44px] max-h-[180px] resize-none border-0 shadow-none focus-visible:ring-0",

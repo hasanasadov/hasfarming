@@ -41,6 +41,7 @@ function isFirebaseLike(u: string) {
 type UiState = "idle" | "testing" | "ok" | "error" | "connected";
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const {
     dataSource,
     setDataSource,
@@ -67,13 +68,11 @@ export default function SettingsPage() {
 
     if (!cleaned) {
       setUi("error");
-      return setErr("Firebase URL daxil edin.");
+      return setErr(t("settings.urlEmpty"));
     }
     if (!isFirebaseLike(cleaned)) {
       setUi("error");
-      return setErr(
-        "Realtime Database URL düzgün deyil (firebaseio.com olmalıdır).",
-      );
+      return setErr(t("settings.urlInvalid"));
     }
 
     setUi("testing");
@@ -85,16 +84,16 @@ export default function SettingsPage() {
       );
 
       const data = await res.json().catch(() => null);
-      if (!data) throw new Error("Yoxlama cavabı alınmadı.");
-      if (!data.ok) throw new Error(data.error || "Yoxlama uğursuz oldu.");
+      if (!data) throw new Error(t("settings.validateFailed"));
+      if (!data.ok) throw new Error(data.error || t("settings.validateError"));
 
       setUi("ok");
       setErr(null);
     } catch (e: any) {
       setUi("error");
-      setErr(e?.message || "Yoxlama alınmadı. URL / Rules problemi ola bilər.");
+      setErr(e?.message || t("settings.validateGeneric"));
     }
-  }, [cleaned]);
+  }, [cleaned, t]);
 
   const enableSensors = useCallback(() => {
     if (!cleaned) return;
@@ -120,35 +119,35 @@ export default function SettingsPage() {
       return (
         <Badge variant="secondary" className="gap-1 rounded-full">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Yoxlanır
+          {t("settings.checking")}
         </Badge>
       );
     if (ui === "ok")
       return (
         <Badge variant="secondary" className="gap-1 rounded-full">
           <CheckCircle2 className="h-3.5 w-3.5" />
-          Hazırdır
+          {t("settings.ready")}
         </Badge>
       );
     if (ui === "connected")
       return (
         <Badge variant="outline" className="gap-1 rounded-full">
           <Link2 className="h-3.5 w-3.5" />
-          Qoşulub
+          {t("settings.connected")}
         </Badge>
       );
     if (ui === "error")
       return (
         <Badge variant="destructive" className="rounded-full">
-          Problem
+          {t("settings.problem")}
         </Badge>
       );
     return (
       <Badge variant="secondary" className="rounded-full">
-        Passiv
+        {t("settings.passive")}
       </Badge>
     );
-  }, [ui]);
+  }, [ui, t]);
 
   return (
     <div className="space-y-6  md:px-0">
@@ -162,18 +161,17 @@ export default function SettingsPage() {
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/40">
                   <Database className="h-4 w-4" />
                 </span>
-                Məlumat mənbəyi
+                {t("settings.dataSource")}
               </CardTitle>
               <CardDescription>
-                Sensor varsa qoşa bilərsən. Yoxdursa da problem deyil — sistem
-                proqnoz ilə işləyəcək.
+                {t("settings.dataSourceDesc")}
               </CardDescription>
             </div>
 
             <div className="flex items-center gap-2">
               {sensorStatus === "error" && (
                 <Badge variant="destructive" className="rounded-full">
-                  Sensor xətası
+                  {t("settings.sensorError")}
                 </Badge>
               )}
               {statusBadge}
@@ -187,7 +185,7 @@ export default function SettingsPage() {
               className="gap-1 rounded-full"
             >
               <Cloud className="h-3.5 w-3.5" />
-              Proqnoz (Weather API)
+              {t("settings.forecastApi")}
             </Badge>
 
             <Badge
@@ -195,13 +193,13 @@ export default function SettingsPage() {
               className="gap-1 rounded-full"
             >
               <Radio className="h-3.5 w-3.5" />
-              Sensor (Firebase)
+              {t("settings.sensorFirebase")}
             </Badge>
 
             {connected && firebaseUrl && (
               <Badge variant="outline" className="gap-1 rounded-full">
                 <Link2 className="h-3.5 w-3.5" />
-                Aktiv
+                {t("settings.active")}
               </Badge>
             )}
           </div>
@@ -213,17 +211,16 @@ export default function SettingsPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
                 <div className="text-sm font-semibold">
-                  Sensor qoşmaq (istəyə bağlı)
+                  {t("settings.sensorSetup")}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  Firebase Realtime Database URL ver, test et və istəsən
-                  aktivləşdir.
+                  {t("settings.sensorSetupDesc")}
                 </div>
               </div>
 
               {/* small help hint */}
               <Badge variant="secondary" className="rounded-full">
-                1 dəqiqə
+                {t("settings.oneMinute")}
               </Badge>
             </div>
 
@@ -248,10 +245,10 @@ export default function SettingsPage() {
                 {ui === "testing" ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Test edilir
+                    {t("settings.testing")}
                   </>
                 ) : (
-                  "Test et"
+                  t("settings.testBtn")
                 )}
               </Button>
             </div>
@@ -268,19 +265,19 @@ export default function SettingsPage() {
               {ui === "ok" && (
                 <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4" />
-                  Yoxlama uğurludur — aktivləşdirə bilərsən.
+                  {t("settings.testOk")}
                 </div>
               )}
 
               {firebaseUrl && (
                 <div className="rounded-xl border bg-muted/20 px-3 py-2 text-xs text-muted-foreground break-all">
-                  Aktiv URL: {firebaseUrl}
+                  {t("settings.activeUrl")} {firebaseUrl}
                 </div>
               )}
 
               {sensorError && (
                 <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive break-all">
-                  Sensor error: {sensorError}
+                  {t("settings.sensorError")}: {sensorError}
                 </div>
               )}
             </div>
@@ -292,7 +289,7 @@ export default function SettingsPage() {
                 disabled={ui !== "ok"}
                 className="rounded-xl"
               >
-                Save & Use Sensors
+                {t("settings.saveUse")}
               </Button>
 
               <Button
@@ -302,7 +299,7 @@ export default function SettingsPage() {
                 className="rounded-xl"
               >
                 <RotateCcw className="h-4 w-4 mr-2" />
-                Sensordan çıx
+                {t("settings.disconnect")}
               </Button>
             </div>
           </div>
