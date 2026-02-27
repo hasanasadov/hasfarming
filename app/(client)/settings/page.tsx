@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { FirebaseSensorDisplay } from "@/components/firebase-sensor-display";
+import { useTranslation } from "@/lib/i18n";
 
 function normalizeFirebaseBaseUrl(raw: string) {
   let url = (raw || "").trim();
