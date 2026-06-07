@@ -26,8 +26,8 @@ export function ContextPreview() {
   const soilDisplay =
     dataSource === "firebase" &&
     dayIndex === 0 &&
-    sensorData?.soilMoisture != null
-      ? `${Math.round(sensorData.soilMoisture)}%`
+    sensorData?.moisture != null
+      ? `${Math.round(sensorData.moisture)}%`
       : d
         ? `${Math.round(d.soilMoisture ?? 0)}%`
         : "—";

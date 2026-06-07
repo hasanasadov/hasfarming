@@ -243,14 +243,11 @@ export function AIChat({
           : null,
         sensor: sensorData
           ? {
-              soilMoisture: sensorData.soilMoisture,
-              soilTemperature: sensorData.soilTemperature,
-              airTemperature: sensorData.airTemperature,
               humidity: sensorData.humidity,
-              ph: sensorData.ph,
-              nitrogen: sensorData.nitrogen,
-              phosphorus: sensorData.phosphorus,
-              potassium: sensorData.potassium,
+              isWorking: sensorData.isWorking,
+              moisture: sensorData.moisture,
+              temperatureAir: sensorData.temperatureAir,
+              temperatureSoil: sensorData.temperatureSoil,
               timestamp: sensorData.timestamp,
             }
           : null,

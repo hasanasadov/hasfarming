@@ -54,7 +54,7 @@ export default function SettingsPage() {
   } = useAppStore();
 
   const [url, setUrl] = useState(
-    firebaseUrl || "https://agrowise-c3772-default-rtdb.firebaseio.com",
+    firebaseUrl || "https://prospera-d59a1-default-rtdb.firebaseio.com",
   );
 
   const cleaned = useMemo(() => normalizeFirebaseBaseUrl(url), [url]);

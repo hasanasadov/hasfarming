@@ -16,7 +16,6 @@ import {
   Droplets,
   Thermometer,
   Wind,
-  FlaskConical,
   RefreshCw,
   Wifi,
   WifiOff,
@@ -44,21 +43,38 @@ function normalizeFirebaseBaseUrl(raw: string) {
   return url;
 }
 
+function isRecord(x: unknown): x is Record<string, any> {
+  return typeof x === "object" && x !== null && !Array.isArray(x);
+}
+
 function toNumberOrNull(x: any) {
   if (x === undefined || x === null) return null;
   const n = typeof x === "string" ? Number(x) : x;
   return Number.isFinite(n) ? Number(n) : null;
 }
 
+function toBooleanOrNull(x: any) {
+  if (typeof x === "boolean") return x;
+  if (typeof x === "string") {
+    const normalized = x.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+  }
+  if (typeof x === "number" && Number.isFinite(x)) return x !== 0;
+  return null;
+}
+
 /**
  * payload-lar fərqlidir:
+ * - { sensor_data: { humidity, isWorking, moisture, temperatureAir, temperatureSoil, timestamp } }
  * - { soil: {...}, isWorking: true }
  * - { moisture: 70, humidity: 60, temperature: 22, nit: 10, phos: 5, pot: 80 }
  * - { "-Nx..": {...}, "-Ny..": {...} }  (push id)
  */
 function pickSensorObject(payload: any) {
-  if (!payload) return null;
+  if (!isRecord(payload)) return null;
 
+  if (isRecord(payload.sensor_data)) return payload.sensor_data;
   if (payload.soil && typeof payload.soil === "object") return payload.soil;
   if (payload.data && typeof payload.data === "object") return payload.data;
   if (payload.readings && typeof payload.readings === "object")
@@ -69,8 +85,11 @@ function pickSensorObject(payload: any) {
     "moisture",
     "humidity",
     "temperature",
+    "temperatureAir",
+    "temperatureSoil",
     "soilMoisture",
     "soilTemperature",
+    "isWorking",
     "ph",
     "nit",
     "phos",
@@ -80,12 +99,18 @@ function pickSensorObject(payload: any) {
   if (keys.some((k) => likely.includes(k))) return payload;
 
   // root push-id strukturu
-  if (keys.length && keys.every((k) => typeof payload[k] === "object")) {
-    const values = keys.map((k) => payload[k]).filter(Boolean);
+  if (keys.length && keys.every((k) => isRecord(payload[k]))) {
+    const values = keys.map((k) => payload[k]).filter(isRecord);
     const withTs = values
       .map((v) => ({
         v,
-        ts: v?.timestamp ?? v?.time ?? v?.createdAt ?? v?.updatedAt ?? 0,
+        ts:
+          v?.sensor_data?.timestamp ??
+          v?.timestamp ??
+          v?.time ??
+          v?.createdAt ??
+          v?.updatedAt ??
+          0,
       }))
       .sort((a, b) => Number(b.ts) - Number(a.ts));
     if (withTs[0]?.v) return withTs[0].v;
@@ -95,74 +120,61 @@ function pickSensorObject(payload: any) {
 }
 
 function parseSensor(raw: any): FirebaseSensorData {
-  const soilMoisture =
-    toNumberOrNull(raw.soilMoisture) ??
-    toNumberOrNull(raw.soil_moisture) ??
-    toNumberOrNull(raw.moisture) ??
-    toNumberOrNull(raw.soilHumidity) ??
-    toNumberOrNull(raw.soil_humidity) ??
+  const sensor = isRecord(raw?.sensor_data)
+    ? raw.sensor_data
+    : isRecord(raw)
+      ? raw
+      : {};
+
+  const moisture =
+    toNumberOrNull(sensor.moisture) ??
+    toNumberOrNull(sensor.soilMoisture) ??
+    toNumberOrNull(sensor.soil_moisture) ??
+    toNumberOrNull(sensor.soilHumidity) ??
+    toNumberOrNull(sensor.soil_humidity) ??
     50;
 
-  const soilTemperature =
-    toNumberOrNull(raw.soilTemperature) ??
-    toNumberOrNull(raw.soil_temperature) ??
-    toNumberOrNull(raw.soil_temp) ??
-    toNumberOrNull(raw.soilTemp) ??
-    toNumberOrNull(raw.temperature_soil) ??
-    toNumberOrNull(raw.temperature) ??
+  const temperatureSoil =
+    toNumberOrNull(sensor.temperatureSoil) ??
+    toNumberOrNull(sensor.soilTemperature) ??
+    toNumberOrNull(sensor.soil_temperature) ??
+    toNumberOrNull(sensor.soil_temp) ??
+    toNumberOrNull(sensor.soilTemp) ??
+    toNumberOrNull(sensor.temperature_soil) ??
+    toNumberOrNull(sensor.temperature) ??
     20;
 
-  const airTemperature =
-    toNumberOrNull(raw.airTemperature) ??
-    toNumberOrNull(raw.air_temperature) ??
-    toNumberOrNull(raw.air_temp) ??
-    toNumberOrNull(raw.temp) ??
-    toNumberOrNull(raw.temperature_air) ??
-    toNumberOrNull(raw.temperature) ??
+  const temperatureAir =
+    toNumberOrNull(sensor.temperatureAir) ??
+    toNumberOrNull(sensor.airTemperature) ??
+    toNumberOrNull(sensor.air_temperature) ??
+    toNumberOrNull(sensor.air_temp) ??
+    toNumberOrNull(sensor.temp) ??
+    toNumberOrNull(sensor.temperature_air) ??
+    toNumberOrNull(sensor.temperature) ??
     25;
 
   const humidity =
-    toNumberOrNull(raw.humidity) ??
-    toNumberOrNull(raw.air_humidity) ??
-    toNumberOrNull(raw.rh) ??
+    toNumberOrNull(sensor.humidity) ??
+    toNumberOrNull(sensor.air_humidity) ??
+    toNumberOrNull(sensor.rh) ??
     60;
 
-  const ph =
-    toNumberOrNull(raw.ph) ??
-    toNumberOrNull(raw.pH) ??
-    toNumberOrNull(raw.soilPh) ??
-    undefined;
-
-  const nitrogen =
-    toNumberOrNull(raw.nitrogen) ??
-    toNumberOrNull(raw.n) ??
-    toNumberOrNull(raw.nit) ??
-    undefined;
-
-  const phosphorus =
-    toNumberOrNull(raw.phosphorus) ??
-    toNumberOrNull(raw.p) ??
-    toNumberOrNull(raw.phos) ??
-    undefined;
-
-  const potassium =
-    toNumberOrNull(raw.potassium) ??
-    toNumberOrNull(raw.k) ??
-    toNumberOrNull(raw.pot) ??
-    undefined;
+  const isWorking =
+    toBooleanOrNull(sensor.isWorking) ??
+    toBooleanOrNull(sensor.working) ??
+    toBooleanOrNull(sensor.online) ??
+    true;
 
   const timestamp =
-    toNumberOrNull(raw.timestamp) ?? toNumberOrNull(raw.time) ?? Date.now();
+    toNumberOrNull(sensor.timestamp) ?? toNumberOrNull(sensor.time) ?? Date.now();
 
   return {
-    soilMoisture,
-    soilTemperature,
-    airTemperature,
     humidity,
-    ph,
-    nitrogen,
-    phosphorus,
-    potassium,
+    isWorking,
+    moisture,
+    temperatureAir,
+    temperatureSoil,
     timestamp,
   };
 }
@@ -245,7 +257,7 @@ export function FirebaseSensorDisplay({
     lastHandledAtRef.current = query.dataUpdatedAt;
 
     failCountRef.current = 0;
-    setConn("connected");
+    setConn(query.data.reading.isWorking ? "connected" : "disconnected");
     setLastUpdate(new Date());
 
     if (showRaw) setRawPreview(query.data.raw);
@@ -480,25 +492,25 @@ export function FirebaseSensorDisplay({
             <StatCard
               icon={<Droplets className="h-4 w-4" />}
               label={t("sensor.soilMoisture")}
-              value={`${sensorData.soilMoisture.toFixed(1)}%`}
+              value={`${sensorData.moisture.toFixed(1)}%`}
               sub={`${t("sensor.optimal")}: 40–70%`}
-              tone={valueTone(sensorData.soilMoisture, { min: 40, max: 70 })}
+              tone={valueTone(sensorData.moisture, { min: 40, max: 70 })}
             />
 
             <StatCard
               icon={<Thermometer className="h-4 w-4" />}
               label={t("sensor.soilTemp")}
-              value={`${sensorData.soilTemperature.toFixed(1)}°C`}
+              value={`${sensorData.temperatureSoil.toFixed(1)}°C`}
               sub={`${t("sensor.optimal")}: 15–25°C`}
-              tone={valueTone(sensorData.soilTemperature, { min: 15, max: 25 })}
+              tone={valueTone(sensorData.temperatureSoil, { min: 15, max: 25 })}
             />
 
             <StatCard
               icon={<Thermometer className="h-4 w-4" />}
               label={t("sensor.airTemp")}
-              value={`${sensorData.airTemperature.toFixed(1)}°C`}
+              value={`${sensorData.temperatureAir.toFixed(1)}°C`}
               sub={`${t("sensor.optimal")}: 18–30°C`}
-              tone={valueTone(sensorData.airTemperature, { min: 18, max: 30 })}
+              tone={valueTone(sensorData.temperatureAir, { min: 18, max: 30 })}
             />
 
             <StatCard
@@ -508,43 +520,6 @@ export function FirebaseSensorDisplay({
               sub={`${t("sensor.optimal")}: 50–70%`}
               tone={valueTone(sensorData.humidity, { min: 50, max: 70 })}
             />
-
-            {sensorData.ph !== undefined && (
-              <StatCard
-                icon={<FlaskConical className="h-4 w-4" />}
-                label="pH"
-                value={sensorData.ph.toFixed(1)}
-                sub={`${t("sensor.optimal")}: 6.0–7.0`}
-                tone={valueTone(sensorData.ph, { min: 6.0, max: 7.0 })}
-              />
-            )}
-
-            {sensorData.nitrogen !== undefined && (
-              <StatCard
-                icon={<span className="text-xs font-semibold">N</span>}
-                label={t("sensor.nitrogen")}
-                value={`${sensorData.nitrogen} mg/kg`}
-                tone="border-border/60 bg-background/50"
-              />
-            )}
-
-            {sensorData.phosphorus !== undefined && (
-              <StatCard
-                icon={<span className="text-xs font-semibold">P</span>}
-                label={t("sensor.phosphorus")}
-                value={`${sensorData.phosphorus} mg/kg`}
-                tone="border-border/60 bg-background/50"
-              />
-            )}
-
-            {sensorData.potassium !== undefined && (
-              <StatCard
-                icon={<span className="text-xs font-semibold">K</span>}
-                label={t("sensor.potassium")}
-                value={`${sensorData.potassium} mg/kg`}
-                tone="border-border/60 bg-background/50"
-              />
-            )}
           </div>
         )}
 

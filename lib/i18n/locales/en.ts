@@ -405,7 +405,7 @@ export const en: Record<TranslationKey, string> = {
   "landing.flow.badge": "Prospera flow",
 
   // Crop selector extra
-  // "crop.waterNeedLow": "Low",
+  "crop.waterNeedLow": "Low",
   "crop.waterNeedMedium": "Medium",
   "crop.waterNeedHigh": "High",
   "crop.water": "Water",

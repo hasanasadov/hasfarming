@@ -84,7 +84,7 @@ export function DashboardStats({
   const isToday = activeIndex === 0;
 
   const shownTemp = isToday
-    ? (sensorData?.airTemperature ?? weather?.temp ?? day?.temp ?? 0)
+    ? (sensorData?.temperatureAir ?? weather?.temp ?? day?.temp ?? 0)
     : (day?.temp ?? 0);
 
   const shownHumidity = isToday
@@ -92,7 +92,7 @@ export function DashboardStats({
     : (day?.humidity ?? 0);
 
   const shownSoil = isToday
-    ? (sensorData?.soilMoisture ??
+    ? (sensorData?.moisture ??
       weather?.soilMoisture ??
       day?.soilMoisture ??
       0)

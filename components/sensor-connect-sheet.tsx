@@ -171,7 +171,7 @@ export function SensorConnectSheet({
             <Label htmlFor="fburl">{t("sc.label")}</Label>
             <Input
               id="fburl"
-              placeholder="https://your-project.firebaseio.com"
+              placeholder="https://prospera-d59a1-default-rtdb.firebaseio.com"
               value={firebaseUrl}
               onChange={(e) => {
                 setFirebaseUrl(e.target.value);
@@ -183,7 +183,7 @@ export function SensorConnectSheet({
             <p className="text-xs text-muted-foreground">
               Nümunə:{" "}
               <code className="px-1 py-0.5 rounded bg-muted">
-                https://xxx-default-rtdb.firebaseio.com
+                https://prospera-d59a1-default-rtdb.firebaseio.com
               </code>
             </p>
           </div>

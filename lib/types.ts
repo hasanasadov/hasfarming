@@ -18,32 +18,20 @@ export interface WeatherData {
   uvIndex?: number;
 }
 
-export interface SoilData {
-  moisture: number;
-  temperature: number;
-  ph: number;
-  nitrogen: number;
-  phosphorus: number;
-  potassium: number;
-  timestamp: string;
-}
-
 export interface FirebaseSensorData {
-  soilMoisture: number;
-  soilTemperature: number;
-  airTemperature: number;
   humidity: number;
-  ph?: number;
-  nitrogen?: number;
-  phosphorus?: number;
-  potassium?: number;
+  isWorking: boolean;
+  moisture: number;
+  temperatureAir: number;
+  temperatureSoil: number;
   timestamp: number;
 }
-interface FirebaseSensorDisplayProps {
-  firebaseUrl: string;
-  onSensorData: (data: FirebaseSensorData) => void;
-  onError?: (message: string) => void; // ✅ new
+
+export interface FirebaseSensorPayload {
+  sensor_data: FirebaseSensorData;
 }
+
+export interface SoilData extends FirebaseSensorData {}
 
 export interface Crop {
   id: string;

@@ -403,7 +403,7 @@ export const az = {
   "landing.flow.badge": "Prospera flow",
 
   // Crop selector extra
-  // "crop.waterNeedLow": "Az",
+  "crop.waterNeedLow": "Az",
   "crop.waterNeedMedium": "Orta",
   "crop.waterNeedHigh": "Çox",
   "crop.water": "Su",

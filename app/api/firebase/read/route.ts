@@ -61,11 +61,12 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Sən əvvəldə bu cür oxuyurdun: `${BASE_URL}/.json`
-  // Burada da eyni məntiqlə bir neçə path yoxlayırıq:
+  // Yeni struktur root-da { sensor_data: {...} } saxlayır.
+  // Ehtiyat üçün sensor_data node-unu ayrıca da yoxlayırıq.
   const tried: any[] = [];
   const candidates = [
     `${base}/.json?t=${Date.now()}`,
+    `${base}/sensor_data.json?t=${Date.now()}`,
     `${base}/soil.json?t=${Date.now()}`,
     `${base}/sensors.json?t=${Date.now()}`,
     `${base}/sensors/soil.json?t=${Date.now()}`,

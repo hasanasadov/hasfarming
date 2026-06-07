@@ -71,18 +71,17 @@ export function Recommendations({
     const isToday = dayIndex === 0;
 
     const temp = isToday
-      ? (sensorData?.airTemperature ?? weather?.temp ?? day?.temp ?? 20)
+      ? (sensorData?.temperatureAir ?? weather?.temp ?? day?.temp ?? 20)
       : (day?.temp ?? 20);
 
     const soilMoisture = isToday
-      ? (sensorData?.soilMoisture ??
+      ? (sensorData?.moisture ??
         weather?.soilMoisture ??
         day?.soilMoisture ??
         50)
       : (day?.soilMoisture ?? 50);
 
     const precipitation = day?.precipitation ?? 0;
-    const ph = isToday ? sensorData?.ph : undefined;
 
     // Temperature
     const dayLabel = dayIndex === 0 ? t("rec.todayLabel") : t("rec.selectedDayLabel");
@@ -150,63 +149,6 @@ export function Recommendations({
         title: t("rec.rainExpected"),
         description: t("rec.rainExpectedDesc").replace("{{rain}}", Math.round(precipitation).toString()),
         priority: "low",
-      });
-    }
-
-    // pH
-    if (ph !== undefined) {
-      if (ph < crop.optimalPh.min) {
-        recs.push({
-          type: "fertilizer",
-          title: t("rec.phLow"),
-          description: t("rec.phLowDesc").replace("{{ph}}", ph.toFixed(1)).replace("{{min}}", crop.optimalPh.min.toString()).replace("{{max}}", crop.optimalPh.max.toString()),
-          priority: "medium",
-        });
-      } else if (ph > crop.optimalPh.max) {
-        recs.push({
-          type: "fertilizer",
-          title: t("rec.phHigh"),
-          description: t("rec.phHighDesc").replace("{{ph}}", ph.toFixed(1)),
-          priority: "medium",
-        });
-      }
-    }
-
-    // NPK only today if sensor
-    if (
-      dayIndex === 0 &&
-      sensorData?.nitrogen !== undefined &&
-      sensorData.nitrogen < 20
-    ) {
-      recs.push({
-        type: "fertilizer",
-        title: t("rec.nitrogenSupport"),
-        description: t("rec.nitrogenDesc"),
-        priority: "medium",
-      });
-    }
-    if (
-      dayIndex === 0 &&
-      sensorData?.phosphorus !== undefined &&
-      sensorData.phosphorus < 15
-    ) {
-      recs.push({
-        type: "fertilizer",
-        title: t("rec.phosphorusSupport"),
-        description: t("rec.phosphorusDesc"),
-        priority: "medium",
-      });
-    }
-    if (
-      dayIndex === 0 &&
-      sensorData?.potassium !== undefined &&
-      sensorData.potassium < 100
-    ) {
-      recs.push({
-        type: "fertilizer",
-        title: t("rec.potassiumSupport"),
-        description: t("rec.potassiumDesc"),
-        priority: "medium",
       });
     }
 

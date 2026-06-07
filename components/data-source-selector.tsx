@@ -187,7 +187,7 @@ export function DataSourceSelector({
                 <div className="flex gap-2">
                   <Input
                     id="firebase-url"
-                    placeholder="https://your-project.firebaseio.com/sensors"
+                    placeholder="https://prospera-d59a1-default-rtdb.firebaseio.com"
                     value={firebaseUrl}
                     onChange={(e) => {
                       setFirebaseUrl(e.target.value);
@@ -247,7 +247,7 @@ export function DataSourceSelector({
                   <strong>{t("ds.firebaseNote")}</strong>{" "}
                   <code className="px-1 py-0.5 rounded bg-muted text-foreground">
                     {
-                      "{ soilMoisture, soilTemperature, airTemperature, humidity, ph, nitrogen, phosphorus, potassium }"
+                      "{ sensor_data: { humidity, isWorking, moisture, temperatureAir, temperatureSoil, timestamp } }"
                     }
                   </code>
                 </p>
