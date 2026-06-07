@@ -1,25 +1,65 @@
-import { useTranslation } from "@/lib/i18n";
-
 // app/api/chat/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Role = "user" | "assistant";
 type IncomingMessage = { role: Role; content: string };
+type SupportedLocale = "az" | "en" | "ru";
+
+const LANGUAGE_BY_LOCALE: Record<
+  SupportedLocale,
+  { label: string; completionMarker: string }
+> = {
+  az: { label: "Azərbaycan dili", completionMarker: "✅ Tamamlandı" },
+  en: { label: "English", completionMarker: "✅ Completed" },
+  ru: { label: "русский язык", completionMarker: "✅ Готово" },
+};
+
+const API_TEXT_BY_LOCALE: Record<
+  SupportedLocale,
+  { apiKeyMissing: string; selectLocation: string; emptyQuestion: string; emptyAnswer: string }
+> = {
+  az: {
+    apiKeyMissing: "API Key tapılmadı (GOOGLE_API_KEY).",
+    selectLocation:
+      "Dəqiq tövsiyə üçün əvvəlcə **Məkan & Hava** bölməsindən məkanı seçin. Sizi indi ora yönləndirirəm.",
+    emptyQuestion: "Sualınızı yazın 🙂",
+    emptyAnswer: "Cavab boş gəldi. Başqa sual ver 🙂",
+  },
+  en: {
+    apiKeyMissing: "API key was not found (GOOGLE_API_KEY).",
+    selectLocation:
+      "For an accurate recommendation, first choose a location in **Location & Weather**. I am redirecting you there now.",
+    emptyQuestion: "Please write your question 🙂",
+    emptyAnswer: "The answer came back empty. Ask another question 🙂",
+  },
+  ru: {
+    apiKeyMissing: "API-ключ не найден (GOOGLE_API_KEY).",
+    selectLocation:
+      "Для точной рекомендации сначала выберите место в разделе **Место и погода**. Сейчас перенаправляю вас туда.",
+    emptyQuestion: "Напишите свой вопрос 🙂",
+    emptyAnswer: "Ответ пришёл пустым. Задайте другой вопрос 🙂",
+  },
+};
+
+function normalizeLocale(locale: any): SupportedLocale {
+  return locale === "en" || locale === "ru" ? locale : "az";
+}
 
 function buildSystemPrompt(context: any) {
   const ctx = context ? JSON.stringify(context, null, 2) : "{}";
-  const locale = context?.meta?.locale || "az";
-  const language =
-    locale === "az"
-      ? "Azərbaycan dili"
-      : locale === "en"
-        ? "English"
-        : "Russian";
+  const locale = normalizeLocale(context?.meta?.locale);
+  const language = LANGUAGE_BY_LOCALE[locale];
 
   return `
 Sən Prospera platformasının peşəkar aqronom köməkçisisən.
-Cavablayacağın dil: Səndən soruşulan sualın dilinə əsaslanır, amma əgər müəyyən etmək mümkün deyilsə, cavab "${language}" dilində olacaq, bu da olmazsa "Azərbaycan dili" olacaq.
+
+DİL QAYDASI (MƏCBURİ):
+- context.meta.locale aktiv sayt dilidir: "${locale}".
+- Bütün istifadəçiyə görünən cavabı YALNIZ "${language.label}" dilində yaz.
+- İstifadəçi başqa dildə sual versə belə, cavab dilini dəyişmə.
+- Söhbət tarixçəsində, welcome mesajında və ya context-də başqa dil görsən, cavab dili üçün onları nəzərə alma.
+- Azərbaycan dilində yalnız context.meta.locale "az" olduqda cavab ver.
 
 Sənə "context" verilir. Sən MÜTLƏQ bu context-ə əsaslanmalısan.
 Context JSON:
@@ -38,7 +78,7 @@ QAYDALAR:
 5) Format:
    - 1 cümlə nəticə
    - 3–6 maddə tövsiyə (bullets)
-   - Sonda "✅ Tamamlandı"
+   - Sonda "${language.completionMarker}"
 6) Qətiyyən uydurma rəqəm yazma. Dəyər yoxdursa "N/A" de.
 
 TƏHLÜKƏSİZLİK / INJECTION QAYDALARI (MƏCBURİ):
@@ -71,11 +111,13 @@ export async function POST(request: Request) {
       context?: any;
       check?: boolean;
     };
+    const locale = normalizeLocale(context?.meta?.locale);
+    const copy = API_TEXT_BY_LOCALE[locale];
 
     const apiKey = process.env.GOOGLE_API_KEY;
     if (!apiKey) {
       return Response.json(
-        { error: "API Key tapılmadı (GOOGLE_API_KEY)." },
+        { error: copy.apiKeyMissing },
         { status: 500 },
       );
     }
@@ -88,7 +130,7 @@ export async function POST(request: Request) {
       return Response.json({
         action: "select_location",
         redirectTo: "/weather",
-        text: "Dəqiq tövsiyə üçün əvvəlcə **Məkan & Hava** bölməsindən məkanı seçin. Sizi indi ora yönləndirirəm.",
+        text: copy.selectLocation,
       });
     }
 
@@ -110,7 +152,7 @@ export async function POST(request: Request) {
     }
 
     if (contents.length === 1) {
-      return Response.json({ text: "Sualınızı yazın 🙂" });
+      return Response.json({ text: copy.emptyQuestion });
     }
 
     const res = await fetch(url, {
@@ -162,7 +204,7 @@ export async function POST(request: Request) {
         .join("") || "";
 
     return Response.json({
-      text: text || "Cavab boş gəldi. Başqa sual ver 🙂",
+      text: text || copy.emptyAnswer,
     });
   } catch (e: any) {
     console.error("Server Xətası:", e);
